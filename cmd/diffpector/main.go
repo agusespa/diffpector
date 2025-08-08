@@ -13,9 +13,27 @@ import (
 )
 
 func main() {
-	configFile := flag.String("config", "config.json", "Path to configuration file")
 	showHelp := flag.Bool("help", false, "Show help message")
 	flag.Parse()
+
+	reportErr := agent.NotifyUserIfReportNotIgnored(".gitignore")
+	if reportErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", reportErr)
+		os.Exit(1)
+	}
+
+	configFile := flag.String("config", "config.json", "Path to configuration file")
+
+	cfg, err := config.LoadConfig(*configFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to load config from %s: %v\n", *configFile, err)
+		os.Exit(1)
+	}
+
+	if !slices.Contains(llm.SupportedProviders, cfg.LLM.Provider) {
+		fmt.Fprintf(os.Stderr, "Error: Unsupported LLM provider: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Println("")
 	fmt.Println("=========================")
@@ -40,17 +58,6 @@ func main() {
 		return
 	}
 
-	cfg, err := config.LoadConfig(*configFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to load config from %s: %v\n", *configFile, err)
-		os.Exit(1)
-	}
-
-	if !slices.Contains(llm.SupportedProviders, cfg.LLM.Provider) {
-		fmt.Fprintf(os.Stderr, "Error: Unsupported LLM provider: %v\n", err)
-		os.Exit(1)
-	}
-
 	providerConfig := llm.ProviderConfig{
 		Type:    llm.ProviderType(cfg.LLM.Provider),
 		Model:   cfg.LLM.Model,
@@ -63,7 +70,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Using %s with model: %s\n", cfg.LLM.Provider, llmProvider.GetModel())
+	fmt.Printf("Using %s with model: %s\n\n", cfg.LLM.Provider, llmProvider.GetModel())
 
 	toolRegistry := tools.NewRegistry()
 
@@ -82,10 +89,6 @@ func main() {
 	}
 
 	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg)
-
-	fmt.Println("")
-	fmt.Println("-------------------------")
-	fmt.Println("")
 
 	if err := codeReviewAgent.ReviewStagedChanges(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Code review failed: %v\n", err)
