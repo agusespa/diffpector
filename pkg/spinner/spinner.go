@@ -65,8 +65,7 @@ func (s *Spinner) Stop() {
 	s.mu.Unlock()
 
 	s.stopChan <- true
-	
-	// Clear the spinner line completely and move to next line
+
 	fmt.Print("\r" + strings.Repeat(" ", len(s.message)+10) + "\r")
 }
 

@@ -33,16 +33,13 @@ func TestNew(t *testing.T) {
 func TestSpinnerStartStop(t *testing.T) {
 	s := New("Test message")
 
-	// Test start
 	s.Start()
 	if !s.active {
 		t.Error("Expected spinner to be active after start")
 	}
 
-	// Give it a moment to start
 	time.Sleep(10 * time.Millisecond)
 
-	// Test stop
 	s.Stop()
 	if s.active {
 		t.Error("Expected spinner to be inactive after stop")
@@ -57,7 +54,6 @@ func TestSpinnerDoubleStart(t *testing.T) {
 		t.Error("Expected spinner to be active after first start")
 	}
 
-	// Starting again should not cause issues
 	s.Start()
 	if !s.active {
 		t.Error("Expected spinner to still be active after second start")
@@ -75,7 +71,6 @@ func TestSpinnerDoubleStop(t *testing.T) {
 		t.Error("Expected spinner to be inactive after stop")
 	}
 
-	// Stopping again should not cause issues
 	s.Stop()
 	if s.active {
 		t.Error("Expected spinner to still be inactive after second stop")
