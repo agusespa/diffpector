@@ -48,14 +48,14 @@ func (a *CodeReviewAgent) executeReview() error {
 
 	changedFiles := ParseStagedFiles(stagedFilesOutput)
 
-	fmt.Println("Files to be reviewed:")
+	fmt.Print("Files to be reviewed:")
 	if len(changedFiles) == 0 {
 		fmt.Println("   ✕ no staged changes found - use 'git add' to stage files for review")
 		return nil
 	}
 
 	for _, file := range changedFiles {
-		fmt.Printf("   ✓ %s", file)
+		fmt.Printf("\n   ✓ %s", file)
 	}
 
 	// Step 2: Get diff for analysis
@@ -146,7 +146,7 @@ func (a *CodeReviewAgent) PrintContextSummary(context *types.ReviewContext) {
 			fmt.Printf("\n   ✓ Symbol analysis completed")
 		}
 	} else {
-		fmt.Println("   ✕ No additional context found")
+		fmt.Println("\n   ✕ No additional context found")
 	}
 }
 
@@ -177,12 +177,20 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 	// Try parsing as-is first, then fallback to cleaning if needed
 	if err := json.Unmarshal([]byte(review), &issues); err != nil {
 		// Fallback: try cleaning markdown formatting
-		cleanedReview := strings.TrimSpace(review)
-		if strings.HasPrefix(cleanedReview, "```") {
-			lines := strings.Split(cleanedReview, "\n")
-			if len(lines) > 2 {
-				// Remove first and last lines (the ``` markers)
-				cleanedReview = strings.Join(lines[1:len(lines)-1], "\n")
+		cleanedReview := review
+		startIndex := strings.Index(cleanedReview, "[")
+		if startIndex == -1 {
+			startIndex = strings.Index(cleanedReview, "{")
+		}
+
+		if startIndex != -1 {
+			endIndex := strings.LastIndex(cleanedReview, "]")
+			if endIndex == -1 {
+				endIndex = strings.LastIndex(cleanedReview, "}")
+			}
+
+			if endIndex != -1 {
+				cleanedReview = cleanedReview[startIndex : endIndex+1]
 			}
 		}
 
