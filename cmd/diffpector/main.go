@@ -59,7 +59,7 @@ func main() {
 
 	llmProvider, err := llm.NewProvider(providerConfig)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to create LLM provider: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to create LLM provider: %v\n", err)
 		os.Exit(1)
 	}
 
