@@ -1,3 +1,3 @@
-module codspectator
+module github.com/agusespa/diffpector
 
-go 1.21
+go 1.24.6

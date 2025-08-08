@@ -47,7 +47,6 @@ func TestLoadConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary config file
 			tmpFile, err := os.CreateTemp("", "config_test_*.json")
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)

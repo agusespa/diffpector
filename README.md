@@ -1,4 +1,4 @@
-# Codspectator Review Agent
+# Diffpector Review Agent
 
 A local code review agent powered by Ollama that analyzes Git commits to identify potential problems, code quality issues, and security vulnerabilities.
 
@@ -35,4 +35,6 @@ The only api currently supported is `ollama`.
 ```
 
 ### Recommended Models
-Work in progress...
+- **qwen2.5-coder:14b** - Best overall performance for code review
+- **codellama** - Good alternative with strong code understanding
+- **qwen2.5-coder:7b** - Faster option for quick reviews
