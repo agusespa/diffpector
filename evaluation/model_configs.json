@@ -1,0 +1,31 @@
+[
+  {
+    "key": "quick-prompt-comparison",
+    "description": "Tests one fast model against all prompts to quickly validate changes.",
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "models": ["qwen2.5-coder:7b"],
+    "prompts": ["default", "detailed"]
+  },
+  {
+    "key": "model-comparison",
+    "description": "Compares all models using the default prompt to find the best overall model.",
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "models": [
+      "qwen2.5-coder:7b",
+      "qwen2.5-coder:14b",
+      "codellama",
+      "deepseek-coder"
+    ],
+    "prompts": ["default"]
+  },
+  {
+    "key": "full-comprehensive",
+    "description": "The full matrix of all models against all prompts for a complete report.",
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "models": ["qwen2.5-coder:7b", "qwen2.5-coder:14b", "codellama"],
+    "prompts": ["default", "detailed"]
+  }
+]

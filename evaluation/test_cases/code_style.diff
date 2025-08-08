@@ -1,0 +1,33 @@
+diff --git a/internal/helper/format.go b/internal/helper/format.go
+index 1234567..abcdefg 100644
+--- a/internal/helper/format.go
++++ b/internal/helper/format.go
+@@ -8,20 +8,20 @@ import (
+ 
+ // formatUserName formats a user's name for display
+ func formatUserName(firstName, lastName string) string {
+-	if firstName == "" && lastName == "" {
++	if firstName==""&&lastName=="" {
+ 		return "Anonymous"
+ 	}
+-	
+-	if firstName == "" {
++	if firstName=="" {
+ 		return lastName
+ 	}
+-	
+-	if lastName == "" {
++	if lastName=="" {
+ 		return firstName
+ 	}
+-	
+ 	return fmt.Sprintf("%s %s", firstName, lastName)
+ }
+ 
+-// Helper function with unclear name
+-func process(data interface{}) interface{} {
++// x processes stuff
++func x(d interface{}) interface{} {
++	// TODO: implement this
+ 	return data
+ }

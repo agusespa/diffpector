@@ -1,0 +1,20 @@
+diff --git a/internal/handler/user.go b/internal/handler/user.go
+index 1234567..abcdefg 100644
+--- a/internal/handler/user.go
++++ b/internal/handler/user.go
+@@ -25,12 +25,10 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+ 	}
+ 	
+ 	user, err := h.userService.GetByID(userID)
+-	if err != nil {
+-		http.Error(w, "User not found", http.StatusNotFound)
+-		return
+-	}
++	// Removed error check - user might be nil
+ 	
+-	if err := json.NewEncoder(w).Encode(user); err != nil {
++	// This will panic if user is nil
++	if err := json.NewEncoder(w).Encode(user.Profile); err != nil {
+ 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+ 	}
+ }

@@ -1,0 +1,37 @@
+diff --git a/internal/cache/manager.go b/internal/cache/manager.go
+index 1234567..abcdefg 100644
+--- a/internal/cache/manager.go
++++ b/internal/cache/manager.go
+@@ -20,15 +20,12 @@ func (m *CacheManager) ProcessLargeDataset(data []byte) error {
+ 		return fmt.Errorf("failed to connect to database: %w", err)
+ 	}
+ 	
+-	defer func() {
+-		if err := conn.Close(); err != nil {
+-			log.Printf("Failed to close database connection: %v", err)
+-		}
+-	}()
++	// Removed connection cleanup - potential resource leak
+ 	
+ 	// Process data in chunks
+ 	for i := 0; i < len(data); i += chunkSize {
+ 		end := i + chunkSize
+ 		if end > len(data) {
+ 			end = len(data)
+ 		}
+ 		
+-		chunk := make([]byte, end-i)
+-		copy(chunk, data[i:end])
++		// Creating large temporary buffers without cleanup
++		tempBuffer := make([]byte, chunkSize*2)  // Oversized buffer
++		copy(tempBuffer, data[i:end])
+ 		
+-		if err := m.processChunk(conn, chunk); err != nil {
++		if err := m.processChunk(conn, tempBuffer); err != nil {
+ 			return err
+ 		}
++		// tempBuffer is never freed and keeps growing
+ 	}
+ 	
+ 	return nil
+ }

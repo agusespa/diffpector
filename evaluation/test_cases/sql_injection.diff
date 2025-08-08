@@ -1,0 +1,25 @@
+diff --git a/internal/database/user.go b/internal/database/user.go
+index 1234567..abcdefg 100644
+--- a/internal/database/user.go
++++ b/internal/database/user.go
+@@ -15,8 +15,8 @@ type User struct {
+ }
+ 
+ func (db *Database) GetUserByEmail(email string) (*User, error) {
+-	query := "SELECT id, email, name FROM users WHERE email = ?"
+-	row := db.conn.QueryRow(query, email)
++	query := fmt.Sprintf("SELECT id, email, name FROM users WHERE email = '%s'", email)
++	row := db.conn.QueryRow(query)
+ 	
+ 	var user User
+ 	err := row.Scan(&user.ID, &user.Email, &user.Name)
+@@ -28,8 +28,8 @@ func (db *Database) GetUserByEmail(email string) (*User, error) {
+ }
+ 
+ func (db *Database) DeleteUser(userID string) error {
+-	query := "DELETE FROM users WHERE id = ?"
+-	_, err := db.conn.Exec(query, userID)
++	query := fmt.Sprintf("DELETE FROM users WHERE id = %s", userID)
++	_, err := db.conn.Exec(query)
+ 	return err
+ }

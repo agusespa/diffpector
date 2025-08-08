@@ -1,0 +1,124 @@
+{
+  "base_dir": "evaluation/test_cases",
+  "mock_files_dir": "evaluation/test_cases/mocks",
+  "test_cases": [
+    {
+      "name": "security_sql_injection",
+      "description": "Test detection of SQL injection vulnerability",
+      "diff_file": "sql_injection.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL"],
+        "min_issues": 1,
+        "max_issues": 3
+      },
+      "metadata": {
+        "category": "security",
+        "language": "go"
+      }
+    },
+    {
+      "name": "performance_n_plus_one",
+      "description": "Test detection of N+1 query problem",
+      "diff_file": "n_plus_one.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 1,
+        "max_issues": 2
+      },
+      "metadata": {
+        "category": "performance",
+        "language": "go"
+      }
+    },
+    {
+      "name": "bug_nil_pointer",
+      "description": "Test detection of potential nil pointer dereference",
+      "diff_file": "nil_pointer.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 1,
+        "max_issues": 2
+      },
+      "metadata": {
+        "category": "bugs",
+        "language": "go"
+      }
+    },
+    {
+      "name": "clean_refactor",
+      "description": "Test that clean refactoring doesn't trigger false positives",
+      "diff_file": "clean_refactor.diff",
+      "expected": {
+        "should_find_issues": false,
+        "max_issues": 1
+      },
+      "metadata": {
+        "category": "clean",
+        "language": "go"
+      }
+    },
+    {
+      "name": "error_handling_missing",
+      "description": "Test detection of missing error handling",
+      "diff_file": "missing_error_handling.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["WARNING"],
+        "min_issues": 1,
+        "max_issues": 3
+      },
+      "metadata": {
+        "category": "error_handling",
+        "language": "go"
+      }
+    },
+    {
+      "name": "memory_leak",
+      "description": "Test detection of potential memory leak",
+      "diff_file": "memory_leak.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 1,
+        "max_issues": 2
+      },
+      "metadata": {
+        "category": "memory",
+        "language": "go"
+      }
+    },
+    {
+      "name": "race_condition",
+      "description": "Test detection of potential race condition",
+      "diff_file": "race_condition.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 1,
+        "max_issues": 2
+      },
+      "metadata": {
+        "category": "concurrency",
+        "language": "go"
+      }
+    },
+    {
+      "name": "code_style_minor",
+      "description": "Test detection of minor code style issues",
+      "diff_file": "code_style.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["MINOR"],
+        "min_issues": 1,
+        "max_issues": 5
+      },
+      "metadata": {
+        "category": "style",
+        "language": "go"
+      }
+    }
+  ]
+}
