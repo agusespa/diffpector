@@ -35,17 +35,14 @@ func (a *CodeReviewAgent) ReviewStagedChanges() error {
 
 func (a *CodeReviewAgent) executeReview() error {
 	// Step 1: Get staged files
-	stagedFilesTool, exists := a.toolRegistry.Get("git_staged_files")
-	if !exists {
-		return fmt.Errorf("git_staged_files tool not available")
-	}
+	stagedFilesTool := a.toolRegistry.Get(tools.ToolNameGitStagedFiles)
 
 	stagedFilesOutput, err := stagedFilesTool.Execute(map[string]any{})
 	if err != nil {
 		return fmt.Errorf("failed to get staged files: %w", err)
 	}
 
-	changedFiles := ParseStagedFiles(stagedFilesOutput)
+	changedFiles := utils.ParseStagedFiles(stagedFilesOutput)
 
 	fmt.Print("Files to be reviewed:")
 	if len(changedFiles) == 0 {
@@ -58,10 +55,7 @@ func (a *CodeReviewAgent) executeReview() error {
 	}
 
 	// Step 2: Get diff for analysis
-	diffTool, exists := a.toolRegistry.Get("git_diff")
-	if !exists {
-		return fmt.Errorf("git_diff tool not available")
-	}
+	diffTool := a.toolRegistry.Get(tools.ToolNameGitDiff)
 
 	diff, err := diffTool.Execute(map[string]any{})
 	if err != nil {
@@ -99,10 +93,7 @@ func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []stri
 		FileContents: make(map[string]string),
 	}
 
-	readTool, exists := a.toolRegistry.Get("read_file")
-	if !exists {
-		return nil, fmt.Errorf("read_file tool not available")
-	}
+	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
 
 	// Step 1: Read changed files first (needed for symbol analysis)
 	for _, file := range changedFiles {
@@ -115,8 +106,8 @@ func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []stri
 	}
 
 	// Step 2: Perform symbol analysis with file contents
-	symbolContextTool, symbolExists := a.toolRegistry.Get("symbol_context")
-	if symbolExists {
+	symbolContextTool := a.toolRegistry.Get(tools.ToolNameSymbolContext)
+	if symbolContextTool != nil {
 		symbolAnalysis, err := symbolContextTool.Execute(map[string]any{
 			"diff":          diff,
 			"file_contents": context.FileContents,
@@ -176,30 +167,16 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 		return nil
 	}
 
-	if err := a.BuildAndWriteMarkdownReport(issues); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (a *CodeReviewAgent) BuildAndWriteMarkdownReport(issues []types.Issue) error {
-	writeTool, exists := a.toolRegistry.Get("write_file")
-	if !exists {
-		return fmt.Errorf("write_file tool not available")
-	}
-	readTool, exists := a.toolRegistry.Get("read_file")
-	if !exists {
-		return fmt.Errorf("read_file tool not available")
-	}
+	writeTool := a.toolRegistry.Get(tools.ToolNameWriteFile)
+	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
 
 	reportGen := NewReportGenerator(readTool, writeTool)
 
-	if err := reportGen.GenerateMarkdownReport(issues); err != nil {
+	criticalCount, warningCount, minorCount, err := reportGen.GenerateMarkdownReport(issues)
+	if err != nil {
 		return err
 	}
 
-	criticalCount, warningCount, minorCount := CountIssuesBySeverity(issues)
 	PrintReviewSummary(criticalCount, warningCount, minorCount)
 
 	return nil

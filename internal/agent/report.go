@@ -6,6 +6,7 @@ import (
 
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
+	"github.com/agusespa/diffpector/internal/utils"
 )
 
 type ReportGenerator struct {
@@ -20,13 +21,13 @@ func NewReportGenerator(readTool, writeTool tools.Tool) *ReportGenerator {
 	}
 }
 
-func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) error {
+func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) (criticalCount, warningCount, minorCount int, err error) {
 	var reportBuilder strings.Builder
 	reportBuilder.WriteString("# Code Review Report\n\n")
 
-	criticalCount := 0
-	warningCount := 0
-	minorCount := 0
+	criticalCount = 0
+	warningCount = 0
+	minorCount = 0
 
 	for _, issue := range issues {
 		content, err := r.readTool.Execute(map[string]any{"filename": issue.FilePath})
@@ -59,7 +60,7 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) error {
 		reportBuilder.WriteString(fmt.Sprintf("**File:** `%s`\n", issue.FilePath))
 		reportBuilder.WriteString(fmt.Sprintf("**Location:** Lines %d-%d\n", issue.StartLine, issue.EndLine))
 		reportBuilder.WriteString("**Code:**\n")
-		language := DetectLanguageFromFilePath(issue.FilePath)
+		language := utils.DetectLanguageFromFilePath(issue.FilePath)
 		reportBuilder.WriteString(fmt.Sprintf("```%s\n", language))
 		for i := issue.StartLine - 1; i < issue.EndLine; i++ {
 			reportBuilder.WriteString(lines[i] + "\n")
@@ -67,7 +68,7 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) error {
 		reportBuilder.WriteString("```\n\n---\n\n")
 	}
 
-	summary := fmt.Sprintf("\n\n**Summary:** %d critical, %d warnings, %d minor issues\n", criticalCount, warningCount, minorCount)
+	var summary = fmt.Sprintf("\n\n**Summary:** %d critical, %d warnings, %d minor issues\n", criticalCount, warningCount, minorCount)
 	reportBuilder.WriteString(summary)
 
 	writeArgs := map[string]any{
@@ -75,12 +76,12 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) error {
 		"content":  reportBuilder.String(),
 	}
 
-	_, err := r.writeTool.Execute(writeArgs)
+	_, err = r.writeTool.Execute(writeArgs)
 	if err != nil {
-		return fmt.Errorf("failed to write markdown code review: %w", err)
+		return 0, 0, 0, fmt.Errorf("failed to write markdown code review: %w", err)
 	}
 
-	return nil
+	return criticalCount, warningCount, minorCount, nil
 }
 
 func (r *ReportGenerator) getSeverityIcon(severity string) string {

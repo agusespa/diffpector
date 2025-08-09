@@ -7,6 +7,7 @@ import (
 
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
+	"github.com/agusespa/diffpector/internal/utils"
 	"github.com/agusespa/diffpector/pkg/config"
 )
 
@@ -35,7 +36,7 @@ type mockWriteTool struct {
 }
 
 func (m *mockWriteTool) Name() string {
-	return "write_file"
+	return string(tools.ToolNameWriteFile)
 }
 
 func (m *mockWriteTool) Description() string {
@@ -58,7 +59,7 @@ type mockReadTool struct {
 }
 
 func (m *mockReadTool) Name() string {
-	return "read_file"
+	return string(tools.ToolNameReadFile)
 }
 
 func (m *mockReadTool) Description() string {
@@ -135,7 +136,7 @@ func TestParseStagedFiles(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ParseStagedFiles(tt.output)
+			result := utils.ParseStagedFiles(tt.output)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d files, got %d", len(tt.expected), len(result))
 			}
@@ -177,8 +178,8 @@ func TestGenerateReview(t *testing.T) {
 		}
 
 		registry := tools.NewRegistry()
-		registry.Register("write_file", &mockWriteTool{})
-		registry.Register("read_file", &mockReadTool{
+		registry.Register(tools.ToolNameWriteFile, &mockWriteTool{})
+		registry.Register(tools.ToolNameReadFile, &mockReadTool{
 			files: map[string]string{
 				"test.go": "package main\n",
 			},
@@ -243,11 +244,11 @@ func TestGenerateReview(t *testing.T) {
 
 	t.Run("missing write_file tool", func(t *testing.T) {
 		mockProvider := &mockLLMProvider{
-			response: "[]",
+			response: `[{"severity": "WARNING", "file_path": "test.go", "start_line": 1, "end_line": 1, "description": "Test issue"}]`,
 		}
 
 		registry := tools.NewRegistry()
-		registry.Register("read_file", &mockReadTool{})
+		registry.Register(tools.ToolNameReadFile, &mockReadTool{})
 
 		cfg := &config.Config{}
 		agent := NewCodeReviewAgent(mockProvider, registry, cfg)
@@ -258,20 +259,22 @@ func TestGenerateReview(t *testing.T) {
 			FileContents: make(map[string]string),
 		}
 
-		err := agent.GenerateReview(context)
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected panic when write_file tool is missing, but did not panic")
+			}
+		}()
 
-		if err == nil || !strings.Contains(err.Error(), "write_file tool not available") {
-			t.Errorf("Expected error about missing write_file tool, got: %v", err)
-		}
+		_ = agent.GenerateReview(context)
 	})
 
 	t.Run("missing read_file tool", func(t *testing.T) {
 		mockProvider := &mockLLMProvider{
-			response: "[]",
+			response: `[{"severity": "WARNING", "file_path": "test.go", "start_line": 1, "end_line": 1, "description": "Test issue"}]`,
 		}
 
 		registry := tools.NewRegistry()
-		registry.Register("write_file", &mockWriteTool{})
+		registry.Register(tools.ToolNameWriteFile, &mockWriteTool{})
 
 		cfg := &config.Config{}
 		agent := NewCodeReviewAgent(mockProvider, registry, cfg)
@@ -282,10 +285,12 @@ func TestGenerateReview(t *testing.T) {
 			FileContents: make(map[string]string),
 		}
 
-		err := agent.GenerateReview(context)
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected panic when read_file tool is missing, but did not panic")
+			}
+		}()
 
-		if err == nil || !strings.Contains(err.Error(), "read_file tool not available") {
-			t.Errorf("Expected error about missing read_file tool, got: %v", err)
-		}
+		_ = agent.GenerateReview(context)
 	})
 }

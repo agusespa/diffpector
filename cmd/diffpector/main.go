@@ -74,14 +74,14 @@ func main() {
 
 	toolRegistry := tools.NewRegistry()
 
-	toolsToRegister := map[string]tools.Tool{
-		"git_diff":         &tools.GitDiffTool{},
-		"git_staged_files": &tools.GitStagedFilesTool{},
-		"git_grep":         &tools.GitGrepTool{},
-		"write_file":       &tools.WriteFileTool{},
-		"read_file":        &tools.ReadFileTool{},
-		"append_file":      &tools.AppendFileTool{},
-		"symbol_context":   tools.NewSymbolContextTool(),
+	toolsToRegister := map[tools.ToolName]tools.Tool{
+		tools.ToolNameGitDiff:         &tools.GitDiffTool{},
+		tools.ToolNameGitStagedFiles: &tools.GitStagedFilesTool{},
+		tools.ToolNameGitGrep:         &tools.GitGrepTool{},
+		tools.ToolNameWriteFile:       &tools.WriteFileTool{},
+		tools.ToolNameReadFile:        &tools.ReadFileTool{},
+		tools.ToolNameAppendFile:      &tools.AppendFileTool{},
+		tools.ToolNameSymbolContext:   tools.NewSymbolContextTool(),
 	}
 
 	for name, tool := range toolsToRegister {
