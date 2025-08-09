@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/agusespa/diffpector/internal/evaluation"
-	"github.com/agusespa/diffpector/internal/llm"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/agusespa/diffpector/internal/evaluation"
+	"github.com/agusespa/diffpector/internal/llm"
+	"github.com/agusespa/diffpector/internal/prompts"
 )
 
 func main() {
@@ -84,7 +86,7 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, promp
 	model = strings.TrimSpace(model)
 	prompt = strings.TrimSpace(prompt)
 
-	if _, err := evaluation.GetPromptVariant(prompt); err != nil {
+	if _, err := prompts.GetPromptVariant(prompt); err != nil {
 		fmt.Printf("Warning: skipping unknown prompt variant '%s'\n", prompt)
 		return
 	}
@@ -126,8 +128,8 @@ func printHelp() {
 
 func printPromptVariants() {
 	fmt.Println("Available prompt variants:")
-	for _, name := range evaluation.ListPromptVariants() {
-		variant, _ := evaluation.GetPromptVariant(name)
+	for _, name := range prompts.ListPromptVariants() {
+		variant, _ := prompts.GetPromptVariant(name)
 		fmt.Printf("  %s: %s\n", name, variant.Description)
 	}
 }

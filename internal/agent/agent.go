@@ -173,8 +173,7 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 		return nil
 	}
 
-	var issues []types.Issue
-	// Try parsing as-is first, then fallback to cleaning if needed
+	var issues []types.Issue // added for testing
 	if err := json.Unmarshal([]byte(review), &issues); err != nil {
 		// Fallback: try cleaning markdown formatting
 		cleanedReview := review
