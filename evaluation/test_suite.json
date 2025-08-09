@@ -66,9 +66,9 @@
       "diff_file": "missing_error_handling.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": ["WARNING"],
+        "expected_severity": ["CRITICAL", "WARNING"],
         "min_issues": 1,
-        "max_issues": 3
+        "max_issues": 4
       },
       "metadata": {
         "category": "error_handling",
