@@ -75,7 +75,7 @@ eval-all: eval-build
 
 eval-prompt: eval-build
 	@echo "Running prompt evaluation..."
-	./$(EVAL_BINARY_NAME) --variant quick-prompt-comparison
+	./$(EVAL_BINARY_NAME) --variant prompt-comparison
 
 eval-model: eval-build
 	@echo "Running model evaluation..."
