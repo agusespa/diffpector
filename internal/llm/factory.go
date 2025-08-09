@@ -11,10 +11,10 @@ const (
 )
 
 type ProviderConfig struct {
-	Type     ProviderType
-	Model    string
-	BaseURL  string
-	APIKey   string
+	Type    ProviderType
+	Model   string
+	BaseURL string
+	APIKey  string
 }
 
 func NewProvider(config ProviderConfig) (Provider, error) {
