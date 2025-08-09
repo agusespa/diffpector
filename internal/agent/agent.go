@@ -1,14 +1,13 @@
 package agent
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 
-	"github.com/agusespa/diffpector/internal/evaluation"
 	"github.com/agusespa/diffpector/internal/llm"
+	"github.com/agusespa/diffpector/internal/prompts"
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
+	"github.com/agusespa/diffpector/internal/utils"
 	"github.com/agusespa/diffpector/pkg/config"
 	"github.com/agusespa/diffpector/pkg/spinner"
 )
@@ -120,7 +119,6 @@ func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []stri
 	if symbolExists {
 		symbolAnalysis, err := symbolContextTool.Execute(map[string]any{
 			"diff":          diff,
-			"changed_files": changedFiles,
 			"file_contents": context.FileContents,
 		})
 		if err != nil {
@@ -151,7 +149,7 @@ func (a *CodeReviewAgent) PrintContextSummary(context *types.ReviewContext) {
 }
 
 func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
-	prompt, err := evaluation.BuildPromptWithTemplate(a.promptVariant, context)
+	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, context)
 	if err != nil {
 		return fmt.Errorf("failed to build review prompt: %w", err)
 	}
@@ -167,35 +165,15 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 
 	analySisSpinner.Stop()
 
-	if strings.TrimSpace(review) == "APPROVED" {
+	issues, err := utils.ParseIssuesFromResponse(review)
+	if err != nil {
+		return fmt.Errorf("failed to parse LLM response: %w", err)
+	}
+
+	if len(issues) == 0 {
 		fmt.Println("---")
 		fmt.Println("✅ Code review passed - no issues found")
 		return nil
-	}
-
-	var issues []types.Issue // added for testing
-	if err := json.Unmarshal([]byte(review), &issues); err != nil {
-		// Fallback: try cleaning markdown formatting
-		cleanedReview := review
-		startIndex := strings.Index(cleanedReview, "[")
-		if startIndex == -1 {
-			startIndex = strings.Index(cleanedReview, "{")
-		}
-
-		if startIndex != -1 {
-			endIndex := strings.LastIndex(cleanedReview, "]")
-			if endIndex == -1 {
-				endIndex = strings.LastIndex(cleanedReview, "}")
-			}
-
-			if endIndex != -1 {
-				cleanedReview = cleanedReview[startIndex : endIndex+1]
-			}
-		}
-
-		if err := json.Unmarshal([]byte(cleanedReview), &issues); err != nil {
-			return fmt.Errorf("failed to decode llm response into JSON. Response: %s, Error: %w", review, err)
-		}
 	}
 
 	if err := a.BuildAndWriteMarkdownReport(issues); err != nil {

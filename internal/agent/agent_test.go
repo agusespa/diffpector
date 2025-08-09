@@ -215,8 +215,8 @@ func TestGenerateReview(t *testing.T) {
 		}
 
 		err := agent.GenerateReview(context)
-		if err == nil || !strings.Contains(err.Error(), "failed to decode llm response into JSON") {
-			t.Errorf("Expected JSON decode error, got: %v", err)
+		if err == nil || !strings.Contains(err.Error(), "format violation") {
+			t.Errorf("Expected format violation error, got: %v", err)
 		}
 	})
 
@@ -243,7 +243,7 @@ func TestGenerateReview(t *testing.T) {
 
 	t.Run("missing write_file tool", func(t *testing.T) {
 		mockProvider := &mockLLMProvider{
-			response: "[]", // Empty JSON array
+			response: "[]",
 		}
 
 		registry := tools.NewRegistry()
