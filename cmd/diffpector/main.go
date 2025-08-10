@@ -70,18 +70,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Using %s with model: %s\n\n", cfg.LLM.Provider, llmProvider.GetModel())
+	fmt.Printf("Using %s API with %s model\n\n", cfg.LLM.Provider, llmProvider.GetModel())
 
 	toolRegistry := tools.NewRegistry()
 
 	toolsToRegister := map[tools.ToolName]tools.Tool{
-		tools.ToolNameGitDiff:         &tools.GitDiffTool{},
+		tools.ToolNameGitDiff:        &tools.GitDiffTool{},
 		tools.ToolNameGitStagedFiles: &tools.GitStagedFilesTool{},
-		tools.ToolNameGitGrep:         &tools.GitGrepTool{},
-		tools.ToolNameWriteFile:       &tools.WriteFileTool{},
-		tools.ToolNameReadFile:        &tools.ReadFileTool{},
-		tools.ToolNameAppendFile:      &tools.AppendFileTool{},
-		tools.ToolNameSymbolContext:   tools.NewSymbolContextTool(),
+		tools.ToolNameGitGrep:        &tools.GitGrepTool{},
+		tools.ToolNameWriteFile:      &tools.WriteFileTool{},
+		tools.ToolNameReadFile:       &tools.ReadFileTool{},
+		tools.ToolNameAppendFile:     &tools.AppendFileTool{},
+		tools.ToolNameSymbolContext:  tools.NewSymbolContextTool(),
 	}
 
 	for name, tool := range toolsToRegister {
