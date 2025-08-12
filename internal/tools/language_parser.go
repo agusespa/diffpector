@@ -1,70 +1,67 @@
 package tools
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 )
 
-// LanguageParser defines the interface for language-specific parsers
 type LanguageParser interface {
-	// ParseFile parses a file and extracts symbols
-	ParseFile(filePath, content string) []Symbol
-	// SupportedExtensions returns the file extensions this parser supports
+	ParseFile(filePath, content string) ([]Symbol, error)
 	SupportedExtensions() []string
-	// Language returns the name of the language this parser handles
 	Language() string
 }
 
-// ParserRegistry manages language-specific parsers
 type ParserRegistry struct {
-	parsers map[string]LanguageParser // extension -> parser
+	parsers map[string]LanguageParser
 }
 
 func NewParserRegistry() *ParserRegistry {
 	registry := &ParserRegistry{
 		parsers: make(map[string]LanguageParser),
 	}
-	
-	// Register Go parser by default
-	goParser := NewGoParser()
+
+	goParser, err := NewGoParser()
+	if err != nil {
+		panic(fmt.Errorf("failed to create Go parser: %w", err))
+	}
+
 	registry.RegisterParser(goParser)
-	
+
+	// javaParser := NewJavaParser()
+	// registry.RegisterParser(javaParser)
+
 	return registry
 }
 
-// RegisterParser registers a language parser for its supported extensions
 func (pr *ParserRegistry) RegisterParser(parser LanguageParser) {
 	for _, ext := range parser.SupportedExtensions() {
 		pr.parsers[ext] = parser
 	}
 }
 
-// GetParser returns the appropriate parser for a file
 func (pr *ParserRegistry) GetParser(filePath string) LanguageParser {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	return pr.parsers[ext]
 }
 
-// ParseFile parses a file using the appropriate language parser
-func (pr *ParserRegistry) ParseFile(filePath, content string) []Symbol {
+func (pr *ParserRegistry) ParseFile(filePath, content string) ([]Symbol, error) {
 	parser := pr.GetParser(filePath)
 	if parser == nil {
-		return []Symbol{} // No parser available for this file type
+		return []Symbol{}, nil
 	}
 	return parser.ParseFile(filePath, content)
 }
 
-// GetSupportedLanguages returns a list of supported languages
-func (pr *ParserRegistry) GetSupportedLanguages() []string {
-	languages := make(map[string]bool)
-	var result []string
+func (pr *ParserRegistry) IsKnownLanguage(filePath string) bool {
+	ext := strings.ToLower(filepath.Ext(filePath))
 	
-	for _, parser := range pr.parsers {
-		if !languages[parser.Language()] {
-			languages[parser.Language()] = true
-			result = append(result, parser.Language())
-		}
+	switch ext {
+	case ".go", ".java", ".js", ".ts", ".py", ".rb", ".php",
+		 ".cs", ".cpp", ".cc", ".cxx", ".c", ".rs", ".kt",
+		 ".scala", ".swift":
+		return true
+	default:
+		return false
 	}
-	
-	return result
 }

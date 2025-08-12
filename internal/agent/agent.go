@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/agusespa/diffpector/internal/llm"
 	"github.com/agusespa/diffpector/internal/prompts"
@@ -13,18 +14,20 @@ import (
 )
 
 type CodeReviewAgent struct {
-	llmProvider   llm.Provider
-	toolRegistry  *tools.Registry
-	config        *config.Config
-	promptVariant string
+	llmProvider    llm.Provider
+	toolRegistry   *tools.Registry
+	config         *config.Config
+	promptVariant  string
+	parserRegistry *tools.ParserRegistry
 }
 
-func NewCodeReviewAgent(provider llm.Provider, registry *tools.Registry, cfg *config.Config) *CodeReviewAgent {
+func NewCodeReviewAgent(provider llm.Provider, registry *tools.Registry, cfg *config.Config, parserRegistry *tools.ParserRegistry) *CodeReviewAgent {
 	return &CodeReviewAgent{
-		llmProvider:   provider,
-		toolRegistry:  registry,
-		config:        cfg,
-		promptVariant: "default",
+		llmProvider:    provider,
+		toolRegistry:   registry,
+		config:         cfg,
+		promptVariant:  prompts.DEFAULT_PROMPT,
+		parserRegistry: parserRegistry,
 	}
 }
 
@@ -54,7 +57,14 @@ func (a *CodeReviewAgent) executeReview() error {
 		fmt.Printf("\n   ✓ %s", file)
 	}
 
-	// Step 2: Get diff for analysis
+	// Step 2: Validate language support and detect primary language
+	primaryLanguage, err := a.validateAndDetectLanguage(changedFiles)
+	if err != nil {
+		fmt.Printf("\n   ✕ %v\n", err)
+		return err
+	}
+
+	// Step 3: Get diff for analysis
 	diffTool := a.toolRegistry.Get(tools.ToolNameGitDiff)
 
 	diff, err := diffTool.Execute(map[string]any{})
@@ -62,21 +72,22 @@ func (a *CodeReviewAgent) executeReview() error {
 		return fmt.Errorf("failed to get staged diff: %w", err)
 	}
 
-	// Step 3: Enhanced context gathering with symbol analysis
+	// Step 4: Enhanced context gathering with symbol analysis
 	fmt.Println()
 	contextSpinner := spinner.New("Analyzing symbols and gathering context...")
 	contextSpinner.Start()
 
-	reviewContext, err := a.GatherEnhancedContext(diff, changedFiles)
+	reviewContext, err := a.GatherEnhancedContext(diff, changedFiles, primaryLanguage)
 	contextSpinner.Stop()
 
 	if err != nil {
-		fmt.Printf("   ⚠️  Context gathering failed: %v\n", err)
+		fmt.Printf("Context gathering failed: %v\n", err)
 		return err
 	}
 
 	a.PrintContextSummary(reviewContext)
 	fmt.Println()
+
 	err = a.GenerateReview(reviewContext)
 	if err != nil {
 		fmt.Printf("Generate Review failed: %v\n", err)
@@ -86,40 +97,45 @@ func (a *CodeReviewAgent) executeReview() error {
 	return nil
 }
 
-func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []string) (*types.ReviewContext, error) {
+func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []string, primaryLanguage string) (*types.ReviewContext, error) {
+	fileContents, err := a.readFileContents(changedFiles)
+	if err != nil {
+		return nil, err
+	}
+
 	context := &types.ReviewContext{
 		Diff:         diff,
 		ChangedFiles: changedFiles,
-		FileContents: make(map[string]string),
+		FileContents: fileContents,
 	}
 
-	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
-
-	// Step 1: Read changed files first (needed for symbol analysis)
-	for _, file := range changedFiles {
-		content, err := readTool.Execute(map[string]any{"filename": file})
-		if err != nil {
-			fmt.Printf("   ⚠️  Failed to read %s: %v\n", file, err)
-			continue
-		}
-		context.FileContents[file] = content
-	}
-
-	// Step 2: Perform symbol analysis with file contents
 	symbolContextTool := a.toolRegistry.Get(tools.ToolNameSymbolContext)
-	if symbolContextTool != nil {
-		symbolAnalysis, err := symbolContextTool.Execute(map[string]any{
-			"diff":          diff,
-			"file_contents": context.FileContents,
-		})
-		if err != nil {
-			fmt.Printf("   ⚠️  Symbol analysis failed: %v\n", err)
-		} else {
-			context.SymbolAnalysis = symbolAnalysis
-		}
+	symbolAnalysis, err := symbolContextTool.Execute(map[string]any{
+		"diff":            diff,
+		"file_contents":   context.FileContents,
+		"primary_language": primaryLanguage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("symbol analysis failed: %w", err)
 	}
+	context.SymbolAnalysis = symbolAnalysis
 
 	return context, nil
+}
+
+func (a *CodeReviewAgent) readFileContents(files []string) (map[string]string, error) {
+	fileContents := make(map[string]string)
+	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
+
+	for _, file := range files {
+		content, err := readTool.Execute(map[string]any{"filename": file})
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+		}
+		fileContents[file] = content
+	}
+
+	return fileContents, nil
 }
 
 func (a *CodeReviewAgent) PrintContextSummary(context *types.ReviewContext) {
@@ -180,4 +196,25 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 	PrintReviewSummary(criticalCount, warningCount, minorCount)
 
 	return nil
+}
+// validateAndDetectLanguage checks if all programming language files are supported and returns the primary language
+func (a *CodeReviewAgent) validateAndDetectLanguage(changedFiles []string) (string, error) {
+	var primaryLanguage string
+	
+	for _, filePath := range changedFiles {
+		parser := a.parserRegistry.GetParser(filePath)
+		if parser != nil {
+			lang := strings.ToLower(parser.Language())
+			
+			if primaryLanguage == "" {
+				primaryLanguage = lang
+			} else if primaryLanguage != lang {
+				return "", fmt.Errorf("multi-language changes detected: %v and %v. Currently only single-language diffs are supported", primaryLanguage, lang)
+			}
+		} else if a.parserRegistry.IsKnownLanguage(filePath) {
+			return "", fmt.Errorf("unsupported language file: %s. No parser available for this file type", filePath)
+		}
+	}
+	
+	return primaryLanguage, nil
 }

@@ -50,21 +50,57 @@ type EvaluationSuite struct {
 	MockFilesDir string     `json:"mock_files_dir,omitempty"`
 }
 
-// EvaluationRun represents a complete evaluation run
+// EvaluationRun represents a single evaluation run
 type EvaluationRun struct {
-	Model         string             `json:"model"`
-	Provider      string             `json:"provider"`
-	PromptVariant string             `json:"prompt_variant"`
-	StartTime     time.Time          `json:"start_time"`
-	EndTime       time.Time          `json:"end_time"`
-	TotalDuration time.Duration      `json:"total_duration"`
-	Results       []EvaluationResult `json:"results"`
-	AverageScore  float64            `json:"average_score"`
-	SuccessRate   float64            `json:"success_rate"`
+	Model         string                `json:"model"`
+	Provider      string                `json:"provider"`
+	PromptVariant string                `json:"prompt_variant"`
+	StartTime     time.Time             `json:"start_time"`
+	EndTime       time.Time             `json:"end_time"`
+	TotalDuration time.Duration         `json:"total_duration"`
+	Results       []TestCaseResult      `json:"results"`
+	AverageScore  float64               `json:"average_score"`
+	SuccessRate   float64               `json:"success_rate"`
+	RunNumber     int                   `json:"run_number,omitempty"`
 }
 
-// EvaluationResult represents the result of a single test case evaluation
+// EvaluationResult represents the complete result of an evaluation (single or multiple runs)
 type EvaluationResult struct {
+	Model           string                    `json:"model"`
+	Provider        string                    `json:"provider"`
+	PromptVariant   string                    `json:"prompt_variant"`
+	TotalRuns       int                       `json:"total_runs"`
+	StartTime       time.Time                 `json:"start_time"`
+	EndTime         time.Time                 `json:"end_time"`
+	TotalDuration   time.Duration             `json:"total_duration"`
+	IndividualRuns  []EvaluationRun           `json:"individual_runs"`
+	AggregatedStats EvaluationStats           `json:"aggregated_stats"`
+	TestCaseStats   map[string]TestCaseStats  `json:"test_case_stats"`
+}
+
+// EvaluationStats contains statistical analysis across multiple runs
+type EvaluationStats struct {
+	AverageScore       float64 `json:"average_score"`
+	ScoreStdDev        float64 `json:"score_std_dev"`
+	MinScore           float64 `json:"min_score"`
+	MaxScore           float64 `json:"max_score"`
+	AverageSuccessRate float64 `json:"average_success_rate"`
+	SuccessRateStdDev  float64 `json:"success_rate_std_dev"`
+	AverageDuration    float64 `json:"average_duration_seconds"`
+	DurationStdDev     float64 `json:"duration_std_dev_seconds"`
+}
+
+// TestCaseStats contains statistics for a specific test case across runs
+type TestCaseStats struct {
+	TestCaseName      string  `json:"test_case_name"`
+	AverageScore      float64 `json:"average_score"`
+	ScoreStdDev       float64 `json:"score_std_dev"`
+	SuccessRate       float64 `json:"success_rate"`
+	ConsistencyScore  float64 `json:"consistency_score"` // How consistent the results are
+}
+
+// TestCaseResult represents the result of a single test case evaluation
+type TestCaseResult struct {
 	TestCase      TestCase      `json:"test_case"`
 	Model         string        `json:"model"`
 	PromptHash    string        `json:"prompt_hash"`
@@ -78,11 +114,13 @@ type EvaluationResult struct {
 
 // EvaluationConfig represents configuration for an evaluation run
 type EvaluationConfig struct {
-	Variant  string   `json:"key"`
-	Provider string   `json:"provider"`
-	BaseURL  string   `json:"base_url"`
-	Models   []string `json:"models"`
-	Prompts  []string `json:"prompts"`
+	Key         string   `json:"key"`
+	Description string   `json:"description,omitempty"`
+	Provider    string   `json:"provider"`
+	BaseURL     string   `json:"base_url"`
+	Models      []string `json:"models"`
+	Prompts     []string `json:"prompts"`
+	Runs        int      `json:"runs,omitempty"`
 }
 
 // PromptVariant represents a prompt template variant

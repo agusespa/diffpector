@@ -76,7 +76,7 @@ func TestGitGrepTool_Description(t *testing.T) {
 func TestGitGrepTool_Execute_MissingPattern(t *testing.T) {
 	tool := &GitGrepTool{}
 	_, err := tool.Execute(map[string]any{})
-	
+
 	if err == nil {
 		t.Error("Expected error for missing pattern")
 	}
@@ -87,14 +87,14 @@ func TestGitGrepTool_Execute_MissingPattern(t *testing.T) {
 
 func TestGitGrepTool_Execute_WithPattern(t *testing.T) {
 	tool := &GitGrepTool{}
-	
+
 	// This test assumes it's run within a Go project where "package" is common.
 	result, err := tool.Execute(map[string]any{"pattern": "package"})
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
-	
+
 	if !strings.Contains(result, "Search results for 'package'") && !strings.Contains(result, "No matches found for pattern: package") {
 		t.Errorf("Expected search results or no matches format, got: %s", result)
 	}

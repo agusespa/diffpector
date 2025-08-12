@@ -12,9 +12,17 @@ import (
 	"github.com/agusespa/diffpector/pkg/config"
 )
 
+var version = "dev"
+
 func main() {
 	showHelp := flag.Bool("help", false, "Show help message")
+	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("diffpector version %s\n", version)
+		return
+	}
 
 	reportErr := agent.NotifyUserIfReportNotIgnored(".gitignore")
 	if reportErr != nil {
@@ -72,6 +80,8 @@ func main() {
 
 	fmt.Printf("Using %s API with %s model\n\n", cfg.LLM.Provider, llmProvider.GetModel())
 
+	parserRegistry := tools.NewParserRegistry()
+	
 	toolRegistry := tools.NewRegistry()
 
 	toolsToRegister := map[tools.ToolName]tools.Tool{
@@ -81,17 +91,17 @@ func main() {
 		tools.ToolNameWriteFile:      &tools.WriteFileTool{},
 		tools.ToolNameReadFile:       &tools.ReadFileTool{},
 		tools.ToolNameAppendFile:     &tools.AppendFileTool{},
-		tools.ToolNameSymbolContext:  tools.NewSymbolContextTool(),
+		tools.ToolNameSymbolContext:  tools.NewSymbolContextTool(".", parserRegistry),
 	}
 
 	for name, tool := range toolsToRegister {
 		toolRegistry.Register(name, tool)
 	}
 
-	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg)
+	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg, parserRegistry)
 
 	if err := codeReviewAgent.ReviewStagedChanges(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Code review failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Code review failed: %v\n", err)
 		os.Exit(1)
 	}
 }
