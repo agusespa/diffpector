@@ -81,7 +81,7 @@ func main() {
 	fmt.Printf("Using %s API with %s model\n\n", cfg.LLM.Provider, llmProvider.GetModel())
 
 	parserRegistry := tools.NewParserRegistry()
-	
+
 	toolRegistry := tools.NewRegistry()
 
 	toolsToRegister := map[tools.ToolName]tools.Tool{

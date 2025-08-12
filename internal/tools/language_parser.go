@@ -55,11 +55,11 @@ func (pr *ParserRegistry) ParseFile(filePath, content string) ([]Symbol, error) 
 
 func (pr *ParserRegistry) IsKnownLanguage(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
-	
+
 	switch ext {
 	case ".go", ".java", ".js", ".ts", ".py", ".rb", ".php",
-		 ".cs", ".cpp", ".cc", ".cxx", ".c", ".rs", ".kt",
-		 ".scala", ".swift":
+		".cs", ".cpp", ".cc", ".cxx", ".c", ".rs", ".kt",
+		".scala", ".swift":
 		return true
 	default:
 		return false

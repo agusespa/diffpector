@@ -111,8 +111,8 @@ func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []stri
 
 	symbolContextTool := a.toolRegistry.Get(tools.ToolNameSymbolContext)
 	symbolAnalysis, err := symbolContextTool.Execute(map[string]any{
-		"diff":            diff,
-		"file_contents":   context.FileContents,
+		"diff":             diff,
+		"file_contents":    context.FileContents,
 		"primary_language": primaryLanguage,
 	})
 	if err != nil {
@@ -161,25 +161,25 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 		return fmt.Errorf("failed to build review prompt: %w", err)
 	}
 
-	analySisSpinner := spinner.New("Analyzing changes...")
-	analySisSpinner.Start()
+	spinner := spinner.New("Analyzing changes...")
+	spinner.Start()
 
 	review, err := a.llmProvider.Generate(prompt)
 	if err != nil {
-		analySisSpinner.Stop()
+		spinner.Stop()
 		return fmt.Errorf("failed to generate code review: %w", err)
 	}
 
-	analySisSpinner.Stop()
-
 	issues, err := utils.ParseIssuesFromResponse(review)
 	if err != nil {
+		spinner.Stop()
 		return fmt.Errorf("failed to parse LLM response: %w", err)
 	}
 
 	if len(issues) == 0 {
 		fmt.Println("---")
 		fmt.Println("✅ Code review passed - no issues found")
+		spinner.Stop()
 		return nil
 	}
 
@@ -193,19 +193,22 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
 		return err
 	}
 
+	spinner.Stop()
+
 	PrintReviewSummary(criticalCount, warningCount, minorCount)
 
 	return nil
 }
+
 // validateAndDetectLanguage checks if all programming language files are supported and returns the primary language
 func (a *CodeReviewAgent) validateAndDetectLanguage(changedFiles []string) (string, error) {
 	var primaryLanguage string
-	
+
 	for _, filePath := range changedFiles {
 		parser := a.parserRegistry.GetParser(filePath)
 		if parser != nil {
 			lang := strings.ToLower(parser.Language())
-			
+
 			if primaryLanguage == "" {
 				primaryLanguage = lang
 			} else if primaryLanguage != lang {
@@ -215,6 +218,6 @@ func (a *CodeReviewAgent) validateAndDetectLanguage(changedFiles []string) (stri
 			return "", fmt.Errorf("unsupported language file: %s. No parser available for this file type", filePath)
 		}
 	}
-	
+
 	return primaryLanguage, nil
 }

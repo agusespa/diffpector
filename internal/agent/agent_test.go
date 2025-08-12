@@ -131,13 +131,13 @@ func TestGatherEnhancedContext(t *testing.T) {
 	// Setup
 	registry := tools.NewRegistry()
 	parserRegistry := tools.NewParserRegistry()
-	
+
 	// Mock tools
 	registry.Register(tools.ToolNameReadFile, &mockTool{
 		name:     "read_file",
 		response: "package main\n\nfunc main() {\n\tprintln(\"hello\")\n}",
 	})
-	
+
 	registry.Register(tools.ToolNameSymbolContext, &mockTool{
 		name:     "symbol_context",
 		response: "Symbol analysis: Found function 'main' in package 'main'",
@@ -198,11 +198,11 @@ index 1234567..abcdefg 100644
 }
 
 func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && 
-			(s[:len(substr)] == substr || 
-			 s[len(s)-len(substr):] == substr || 
-			 containsSubstring(s, substr))))
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) &&
+			(s[:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				containsSubstring(s, substr))))
 }
 
 func containsSubstring(s, substr string) bool {
@@ -217,7 +217,7 @@ func containsSubstring(s, substr string) bool {
 func TestToolRegistryIntegration(t *testing.T) {
 	// Test that all required tools can be registered and retrieved
 	registry := tools.NewRegistry()
-	
+
 	// Register mock implementations of required tools
 	requiredTools := map[tools.ToolName]string{
 		tools.ToolNameGitStagedFiles: "file1.go\nfile2.go",
@@ -240,7 +240,7 @@ func TestToolRegistryIntegration(t *testing.T) {
 		if tool == nil {
 			t.Errorf("Tool %s not found in registry", toolName)
 		}
-		
+
 		// Test execution
 		result, err := tool.Execute(map[string]any{})
 		if err != nil {
@@ -257,13 +257,13 @@ func TestEndToEndContextGathering(t *testing.T) {
 	registry := tools.NewRegistry()
 	parserRegistry := tools.NewParserRegistry()
 	cfg := &config.Config{}
-	
+
 	// Register all required tools with realistic mock data
 	registry.Register(tools.ToolNameGitStagedFiles, &mockTool{
 		name:     "git_staged_files",
 		response: "main.go\nutils.go",
 	})
-	
+
 	registry.Register(tools.ToolNameGitDiff, &mockTool{
 		name: "git_diff",
 		response: `diff --git a/main.go b/main.go
@@ -279,7 +279,7 @@ index 1234567..abcdefg 100644
 +	doSomething()
  }`,
 	})
-	
+
 	registry.Register(tools.ToolNameReadFile, &mockTool{
 		name: "read_file",
 		response: `package main
@@ -293,7 +293,7 @@ func doSomething() {
 	// implementation
 }`,
 	})
-	
+
 	registry.Register(tools.ToolNameSymbolContext, &mockTool{
 		name:     "symbol_context",
 		response: "Symbol analysis: Found functions 'main', 'doSomething' in package 'main'",
@@ -303,7 +303,7 @@ func doSomething() {
 	mockProvider := &mockLLMProvider{
 		response: `[{"severity": "minor", "file_path": "main.go", "start_line": 4, "end_line": 4, "description": "Consider adding error handling"}]`,
 	}
-	
+
 	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry)
 
 	// Test the main execution flow components
@@ -322,12 +322,12 @@ func doSomething() {
 		diff := "mock diff content"
 		files := []string{"main.go"}
 		primaryLang := "go"
-		
+
 		context, err := agent.GatherEnhancedContext(diff, files, primaryLang)
 		if err != nil {
 			t.Fatalf("Context gathering failed: %v", err)
 		}
-		
+
 		// Verify context structure
 		if context.Diff != diff {
 			t.Error("Diff not preserved in context")
@@ -349,11 +349,11 @@ func doSomething() {
 		if err != nil {
 			t.Fatalf("Reading file contents failed: %v", err)
 		}
-		
+
 		if len(contents) != 2 {
 			t.Errorf("Expected 2 file contents, got %d", len(contents))
 		}
-		
+
 		for _, file := range files {
 			if contents[file] == "" {
 				t.Errorf("File content for %s is empty", file)
@@ -366,13 +366,13 @@ func TestErrorHandling(t *testing.T) {
 	registry := tools.NewRegistry()
 	parserRegistry := tools.NewParserRegistry()
 	cfg := &config.Config{}
-	
+
 	// Register tools that will fail
 	registry.Register(tools.ToolNameReadFile, &mockTool{
 		name: "read_file",
 		err:  fmt.Errorf("file not found"),
 	})
-	
+
 	mockProvider := &mockLLMProvider{}
 	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry)
 
@@ -390,7 +390,7 @@ func TestErrorHandling(t *testing.T) {
 			name: "symbol_context",
 			err:  fmt.Errorf("symbol analysis failed"),
 		})
-		
+
 		// Register working read file tool
 		registry.Register(tools.ToolNameReadFile, &mockTool{
 			name:     "read_file",
@@ -400,7 +400,7 @@ func TestErrorHandling(t *testing.T) {
 		diff := "mock diff"
 		files := []string{"main.go"}
 		primaryLang := "go"
-		
+
 		_, err := agent.GatherEnhancedContext(diff, files, primaryLang)
 		if err == nil {
 			t.Error("Expected error when symbol analysis fails")
@@ -441,7 +441,7 @@ func greet(name string) string {
 	// Setup registry with real tools
 	registry := tools.NewRegistry()
 	parserRegistry := tools.NewParserRegistry()
-	
+
 	// Register real tools
 	registry.Register(tools.ToolNameReadFile, &tools.ReadFileTool{})
 	registry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(tempDir, parserRegistry))
@@ -536,13 +536,13 @@ index 1234567..abcdefg 100644
 func TestContextGatheringWithRealComponents(t *testing.T) {
 	// This test verifies that the context gathering works with real components
 	// but uses mock data to avoid git dependencies
-	
+
 	// Create a temporary test directory
 	tempDir := t.TempDir()
-	
+
 	registry := tools.NewRegistry()
 	parserRegistry := tools.NewParserRegistry()
-	
+
 	// Register real tools
 	registry.Register(tools.ToolNameReadFile, &tools.ReadFileTool{})
 	registry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(tempDir, parserRegistry))

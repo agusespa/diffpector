@@ -52,30 +52,30 @@ type EvaluationSuite struct {
 
 // EvaluationRun represents a single evaluation run
 type EvaluationRun struct {
-	Model         string                `json:"model"`
-	Provider      string                `json:"provider"`
-	PromptVariant string                `json:"prompt_variant"`
-	StartTime     time.Time             `json:"start_time"`
-	EndTime       time.Time             `json:"end_time"`
-	TotalDuration time.Duration         `json:"total_duration"`
-	Results       []TestCaseResult      `json:"results"`
-	AverageScore  float64               `json:"average_score"`
-	SuccessRate   float64               `json:"success_rate"`
-	RunNumber     int                   `json:"run_number,omitempty"`
+	Model         string           `json:"model"`
+	Provider      string           `json:"provider"`
+	PromptVariant string           `json:"prompt_variant"`
+	StartTime     time.Time        `json:"start_time"`
+	EndTime       time.Time        `json:"end_time"`
+	TotalDuration time.Duration    `json:"total_duration"`
+	Results       []TestCaseResult `json:"results"`
+	AverageScore  float64          `json:"average_score"`
+	SuccessRate   float64          `json:"success_rate"`
+	RunNumber     int              `json:"run_number,omitempty"`
 }
 
 // EvaluationResult represents the complete result of an evaluation (single or multiple runs)
 type EvaluationResult struct {
-	Model           string                    `json:"model"`
-	Provider        string                    `json:"provider"`
-	PromptVariant   string                    `json:"prompt_variant"`
-	TotalRuns       int                       `json:"total_runs"`
-	StartTime       time.Time                 `json:"start_time"`
-	EndTime         time.Time                 `json:"end_time"`
-	TotalDuration   time.Duration             `json:"total_duration"`
-	IndividualRuns  []EvaluationRun           `json:"individual_runs"`
-	AggregatedStats EvaluationStats           `json:"aggregated_stats"`
-	TestCaseStats   map[string]TestCaseStats  `json:"test_case_stats"`
+	Model           string                   `json:"model"`
+	Provider        string                   `json:"provider"`
+	PromptVariant   string                   `json:"prompt_variant"`
+	TotalRuns       int                      `json:"total_runs"`
+	StartTime       time.Time                `json:"start_time"`
+	EndTime         time.Time                `json:"end_time"`
+	TotalDuration   time.Duration            `json:"total_duration"`
+	IndividualRuns  []EvaluationRun          `json:"individual_runs"`
+	AggregatedStats EvaluationStats          `json:"aggregated_stats"`
+	TestCaseStats   map[string]TestCaseStats `json:"test_case_stats"`
 }
 
 // EvaluationStats contains statistical analysis across multiple runs
@@ -92,11 +92,11 @@ type EvaluationStats struct {
 
 // TestCaseStats contains statistics for a specific test case across runs
 type TestCaseStats struct {
-	TestCaseName      string  `json:"test_case_name"`
-	AverageScore      float64 `json:"average_score"`
-	ScoreStdDev       float64 `json:"score_std_dev"`
-	SuccessRate       float64 `json:"success_rate"`
-	ConsistencyScore  float64 `json:"consistency_score"` // How consistent the results are
+	TestCaseName     string  `json:"test_case_name"`
+	AverageScore     float64 `json:"average_score"`
+	ScoreStdDev      float64 `json:"score_std_dev"`
+	SuccessRate      float64 `json:"success_rate"`
+	ConsistencyScore float64 `json:"consistency_score"` // How consistent the results are
 }
 
 // TestCaseResult represents the result of a single test case evaluation

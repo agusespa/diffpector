@@ -57,8 +57,8 @@ func TestGoParser_ParseFile(t *testing.T) {
 	}
 
 	expectedSymbols := []string{
-		"\"fmt\"", "\"strings\"", "Pi", "E", "Version", "GlobalVar", 
-		"Person", "Name", "Age", "Greeter", "Greet", "Say", "Add", 
+		"\"fmt\"", "\"strings\"", "Pi", "E", "Version", "GlobalVar",
+		"Person", "Name", "Age", "Greeter", "Greet", "Say", "Add",
 		"MaxValue", "MinValue",
 	}
 
