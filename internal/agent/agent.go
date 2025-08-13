@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/agusespa/diffpector/internal/llm"
@@ -132,7 +133,13 @@ func (a *CodeReviewAgent) readFileContents(files []string) (map[string]string, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %s: %w", file, err)
 		}
-		fileContents[file] = content
+		
+		absPath, err := filepath.Abs(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get absolute path for %s: %w", file, err)
+		}
+		
+		fileContents[absPath] = content
 	}
 
 	return fileContents, nil

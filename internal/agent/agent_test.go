@@ -188,7 +188,14 @@ index 1234567..abcdefg 100644
 		t.Errorf("Expected file contents to have 1 entry, got %d", len(context.FileContents))
 	}
 
-	if context.FileContents["main.go"] == "" {
+	var mainGoContent string
+	for path, content := range context.FileContents {
+		if filepath.Base(path) == "main.go" {
+			mainGoContent = content
+			break
+		}
+	}
+	if mainGoContent == "" {
 		t.Errorf("Expected file contents for main.go to be populated")
 	}
 
@@ -355,8 +362,18 @@ func doSomething() {
 		}
 
 		for _, file := range files {
-			if contents[file] == "" {
-				t.Errorf("File content for %s is empty", file)
+			found := false
+			for path, content := range contents {
+				if filepath.Base(path) == filepath.Base(file) {
+					if content == "" {
+						t.Errorf("File content for %s is empty", file)
+					}
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("File content for %s not found", file)
 			}
 		}
 	})
