@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/agusespa/diffpector/internal/types"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 )
@@ -33,11 +34,276 @@ func (gp *GoParser) Language() string {
 	return "Go"
 }
 
+func (gp *GoParser) SitterLanguage() *sitter.Language {
+	return gp.language
+}
+
+func (gp *GoParser) FindSymbolUsages(filePath, content, symbolName string) ([]types.SymbolUsage, error) {
+	src := []byte(content)
+	tree := gp.parser.Parse(src, nil)
+	if tree == nil {
+		return nil, fmt.Errorf("failed to parse Go file: tree-sitter returned nil")
+	}
+	defer tree.Close()
+
+	var usages []types.SymbolUsage
+
+	// Query for identifier nodes that could be symbol usages
+	queryText := `
+	(call_expression
+		function: (identifier) @call)
+	(call_expression
+		function: (selector_expression
+			field: (field_identifier) @method_call))
+	(identifier) @identifier
+	`
+
+	q, err := sitter.NewQuery(gp.language, queryText)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create query: %w", err)
+	}
+	defer q.Close()
+
+	qc := sitter.NewQueryCursor()
+	matches := qc.Matches(q, tree.RootNode(), src)
+
+	processedLines := make(map[int]bool) // Avoid duplicate context for same line
+
+	for {
+		m := matches.Next()
+		if m == nil {
+			break
+		}
+
+		for _, c := range m.Captures {
+			node := c.Node
+			nodeText := strings.TrimSpace(node.Utf8Text(src))
+
+			if nodeText == symbolName {
+				lineNum := int(node.StartPosition().Row) + 1
+
+				if processedLines[lineNum] {
+					continue
+				}
+
+				if gp.isSymbolUsage(&node, src, symbolName) {
+					context := gp.extractUsageContext(src, &node, symbolName)
+					if context != "" {
+						usages = append(usages, types.SymbolUsage{
+							SymbolName: symbolName,
+							FilePath:   filePath,
+							LineNumber: lineNum,
+							Context:    context,
+						})
+						processedLines[lineNum] = true
+					}
+				}
+			}
+		}
+	}
+
+	return usages, nil
+}
+
+// isSymbolUsage determines if an AST node represents a symbol usage (not definition)
+func (gp *GoParser) isSymbolUsage(node *sitter.Node, src []byte, symbolName string) bool {
+	parent := node.Parent()
+	if parent == nil {
+		return false
+	}
+
+	parentKind := parent.Kind()
+
+	// Skip if this is part of a function/method/type definition
+	switch parentKind {
+	case "function_declaration", "method_declaration", "type_declaration", "type_spec":
+		return false
+	case "field_declaration", "parameter_declaration", "var_declaration", "const_declaration":
+		return false
+	}
+
+	// Check if parent is a function/method declaration by walking up
+	current := parent
+	for current != nil {
+		kind := current.Kind()
+		if kind == "function_declaration" || kind == "method_declaration" {
+			// Check if our node is the function name (definition)
+			nameNode := current.ChildByFieldName("name")
+			if nameNode != nil && nameNode.StartByte() == node.StartByte() && nameNode.EndByte() == node.EndByte() {
+				return false
+			}
+			break
+		}
+		current = current.Parent()
+	}
+
+	return true
+}
+
+// extractUsageContext extracts semantic context around a symbol usage
+func (gp *GoParser) extractUsageContext(src []byte, node *sitter.Node, symbolName string) string {
+	// Find containing function and extract it entirely
+	if containingFunc := gp.findContainingFunction(node); containingFunc != nil {
+		return gp.formatFunctionContext(src, containingFunc, node, symbolName)
+	}
+
+	// If not in a function, extract smart line context
+	return gp.extractLineContext(src, node, symbolName)
+}
+
+func (gp *GoParser) findContainingFunction(node *sitter.Node) *sitter.Node {
+	current := node
+	for current != nil {
+		kind := current.Kind()
+		if kind == "function_declaration" || kind == "method_declaration" {
+			return current
+		}
+		current = current.Parent()
+	}
+	return nil
+}
+
+func (gp *GoParser) formatFunctionContext(src []byte, funcNode *sitter.Node, usageNode *sitter.Node, symbolName string) string {
+	var builder strings.Builder
+
+	// Add function signature
+	signature := gp.extractFunctionSignature(src, funcNode)
+	builder.WriteString(fmt.Sprintf("Function: %s\n", signature))
+	builder.WriteString("Context:\n")
+
+	// Add the entire function with usage highlighted
+	funcText := funcNode.Utf8Text(src)
+	lines := strings.Split(funcText, "\n")
+
+	usageLine := int(usageNode.StartPosition().Row - funcNode.StartPosition().Row)
+
+	for i, line := range lines {
+		prefix := "  "
+		if i == usageLine {
+			prefix = "→ " // Highlight the usage line
+		}
+		builder.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
+	}
+
+	return builder.String()
+}
+
+func (gp *GoParser) extractFunctionSignature(src []byte, funcNode *sitter.Node) string {
+	// Extract function name
+	nameNode := funcNode.ChildByFieldName("name")
+	if nameNode == nil {
+		return "unknown"
+	}
+
+	name := nameNode.Utf8Text(src)
+
+	// Extract parameters
+	paramsNode := funcNode.ChildByFieldName("parameters")
+	params := ""
+	if paramsNode != nil {
+		params = paramsNode.Utf8Text(src)
+	}
+
+	// Extract return type
+	resultNode := funcNode.ChildByFieldName("result")
+	result := ""
+	if resultNode != nil {
+		result = " " + resultNode.Utf8Text(src)
+	}
+
+	// Check if it's a method (has receiver)
+	receiverNode := funcNode.ChildByFieldName("receiver")
+	if receiverNode != nil {
+		receiver := receiverNode.Utf8Text(src)
+		return fmt.Sprintf("func %s %s%s%s", receiver, name, params, result)
+	}
+
+	return fmt.Sprintf("func %s%s%s", name, params, result)
+}
+
+func (gp *GoParser) extractLineContext(src []byte, node *sitter.Node, symbolName string) string {
+	// Simple line-based context with a few lines before and after
+	lines := strings.Split(string(src), "\n")
+	usageLine := int(node.StartPosition().Row)
+
+	// Simple context: 3 lines before and after
+	contextSize := 3
+	start := usageLine - contextSize
+	if start < 0 {
+		start = 0
+	}
+
+	end := usageLine + contextSize
+	if end >= len(lines) {
+		end = len(lines) - 1
+	}
+
+	var builder strings.Builder
+	builder.WriteString("Context:\n")
+
+	for i := start; i <= end; i++ {
+		prefix := "  "
+		if i == usageLine {
+			prefix = "→ "
+		}
+		builder.WriteString(fmt.Sprintf("%s%d: %s\n", prefix, i+1, lines[i]))
+	}
+
+	return builder.String()
+}
+
+func (gp *GoParser) GetSymbolContext(filePath, content string, symbol types.Symbol) (string, error) {
+	// Parse the file to get AST
+	src := []byte(content)
+	tree := gp.parser.Parse(src, nil)
+	if tree == nil {
+		return "", fmt.Errorf("failed to parse Go file: tree-sitter returned nil")
+	}
+	defer tree.Close()
+
+	// Find the symbol at the given location
+	root := tree.RootNode()
+	targetNode := gp.findNodeAtLocation(root, src, symbol.StartLine)
+	if targetNode == nil {
+		return "", fmt.Errorf("could not find symbol at line %d", symbol.StartLine)
+	}
+
+	// Use the same context extraction logic as for usages
+	return gp.extractUsageContext(src, targetNode, symbol.Name), nil
+}
+
+func (gp *GoParser) findNodeAtLocation(root *sitter.Node, src []byte, targetLine int) *sitter.Node {
+	// Simple approach: find any node that contains the target line
+	var findNode func(*sitter.Node) *sitter.Node
+	findNode = func(node *sitter.Node) *sitter.Node {
+		startLine := int(node.StartPosition().Row) + 1
+		endLine := int(node.EndPosition().Row) + 1
+
+		// If this node contains the target line
+		if startLine <= targetLine && targetLine <= endLine {
+			// Check children first (more specific)
+			for i := uint(0); i < node.ChildCount(); i++ {
+				child := node.Child(i)
+				if child != nil {
+					if result := findNode(child); result != nil {
+						return result
+					}
+				}
+			}
+			// If no child contains it, return this node
+			return node
+		}
+		return nil
+	}
+
+	return findNode(root)
+}
+
 func (gp *GoParser) SupportedExtensions() []string {
 	return []string{`.go`}
 }
 
-func (gp *GoParser) ParseFile(filePath, content string) ([]Symbol, error) {
+func (gp *GoParser) ParseFile(filePath, content string) ([]types.Symbol, error) {
 	src := []byte(content)
 	tree := gp.parser.Parse(src, nil)
 	if tree == nil {
@@ -77,7 +343,7 @@ func (gp *GoParser) ParseFile(filePath, content string) ([]Symbol, error) {
 	defer q.Close()
 
 	qc := sitter.NewQueryCursor()
-	var symbols []Symbol
+	var symbols []types.Symbol
 
 	matches := qc.Matches(q, tree.RootNode(), src)
 
@@ -102,7 +368,7 @@ func (gp *GoParser) ParseFile(filePath, content string) ([]Symbol, error) {
 					continue
 				}
 
-				symbols = append(symbols, Symbol{
+				symbols = append(symbols, types.Symbol{
 					Name:      name,
 					Package:   packageName,
 					FilePath:  filePath,

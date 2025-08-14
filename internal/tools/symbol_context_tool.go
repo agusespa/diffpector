@@ -2,22 +2,22 @@ package tools
 
 import (
 	"fmt"
+	"path/filepath"
 
+	"github.com/agusespa/diffpector/internal/types"
 	"github.com/agusespa/diffpector/internal/utils"
 )
 
 type SymbolContextTool struct {
-	parser      *SymbolParser
+	registry    *ParserRegistry
 	gatherer    *SymbolContextGatherer
 	projectRoot string
 }
 
 func NewSymbolContextTool(projectRoot string, registry *ParserRegistry) *SymbolContextTool {
-	parser := NewSymbolParser(registry)
-
 	return &SymbolContextTool{
-		parser:      parser,
-		gatherer:    NewSymbolContextGatherer(parser),
+		registry:    registry,
+		gatherer:    NewSymbolContextGatherer(registry),
 		projectRoot: projectRoot,
 	}
 }
@@ -46,13 +46,21 @@ func (t *SymbolContextTool) Execute(args map[string]any) (string, error) {
 		primaryLanguage = ""
 	}
 
-	allSymbols, err := t.parser.ParseChangedFiles(fileContents)
+	allSymbols, err := t.registry.ParseChangedFiles(fileContents)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse changed files: %w", err)
 	}
 
 	diffContext := utils.GetDiffContext(diff)
-	affectedSymbols := FilterAffectedSymbols(allSymbols, diffContext)
+
+	// Normalize diff context paths to absolute paths to match fileContents keys
+	normalizedDiffContext := make(map[string][]utils.LineRange)
+	for filePath, ranges := range diffContext {
+		absPath := t.normalizeFilePath(filePath)
+		normalizedDiffContext[absPath] = ranges
+	}
+
+	affectedSymbols := FilterAffectedSymbols(allSymbols, normalizedDiffContext)
 
 	symbolContext, err := t.gatherer.GatherSymbolContext(affectedSymbols, t.projectRoot, primaryLanguage)
 	if err != nil {
@@ -69,8 +77,8 @@ func (t *SymbolContextTool) Execute(args map[string]any) (string, error) {
 	return symbolContext, nil
 }
 
-func FilterAffectedSymbols(symbols []Symbol, diffContext map[string][]utils.LineRange) []Symbol {
-	var affected []Symbol
+func FilterAffectedSymbols(symbols []types.Symbol, diffContext map[string][]utils.LineRange) []types.Symbol {
+	var affected []types.Symbol
 
 	seen := make(map[string]bool)
 
@@ -99,4 +107,11 @@ func FilterAffectedSymbols(symbols []Symbol, diffContext map[string][]utils.Line
 	}
 
 	return affected
+}
+
+func (t *SymbolContextTool) normalizeFilePath(filePath string) string {
+	if filepath.IsAbs(filePath) {
+		return filepath.Clean(filePath)
+	}
+	return filepath.Clean(filepath.Join(t.projectRoot, filePath))
 }
