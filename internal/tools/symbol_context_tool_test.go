@@ -4,19 +4,20 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/agusespa/diffpector/internal/types"
 	"github.com/agusespa/diffpector/internal/utils"
 )
 
 func TestFilterAffectedSymbols(t *testing.T) {
 	testCases := []struct {
 		name        string
-		symbols     []Symbol
+		symbols     []types.Symbol
 		diffContext map[string][]utils.LineRange
-		want        []Symbol
+		want        []types.Symbol
 	}{
 		{
 			name: "Basic case with multiple changes",
-			symbols: []Symbol{
+			symbols: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 				{Name: "bar", FilePath: "file.go", StartLine: 15, EndLine: 20},
 				{Name: "baz", FilePath: "file.go", StartLine: 25, EndLine: 30},
@@ -27,14 +28,14 @@ func TestFilterAffectedSymbols(t *testing.T) {
 					{Start: 18, Count: 1}, // Change inside "bar"
 				},
 			},
-			want: []Symbol{
+			want: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 				{Name: "bar", FilePath: "file.go", StartLine: 15, EndLine: 20},
 			},
 		},
 		{
 			name: "Change on start and end lines",
-			symbols: []Symbol{
+			symbols: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 				{Name: "bar", FilePath: "file.go", StartLine: 11, EndLine: 15},
 			},
@@ -44,14 +45,14 @@ func TestFilterAffectedSymbols(t *testing.T) {
 					{Start: 15, Count: 1}, // Change on the end line of "bar"
 				},
 			},
-			want: []Symbol{
+			want: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 				{Name: "bar", FilePath: "file.go", StartLine: 11, EndLine: 15},
 			},
 		},
 		{
 			name: "No affected symbols",
-			symbols: []Symbol{
+			symbols: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 			},
 			diffContext: map[string][]utils.LineRange{
@@ -59,11 +60,11 @@ func TestFilterAffectedSymbols(t *testing.T) {
 					{Start: 12, Count: 2}, // Change outside any symbol range
 				},
 			},
-			want: []Symbol{},
+			want: []types.Symbol{},
 		},
 		{
 			name: "Multiple symbols on the same line",
-			symbols: []Symbol{
+			symbols: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 5},
 				{Name: "bar", FilePath: "file.go", StartLine: 5, EndLine: 5},
 			},
@@ -72,14 +73,14 @@ func TestFilterAffectedSymbols(t *testing.T) {
 					{Start: 5, Count: 1}, // Change on the single line where both symbols reside
 				},
 			},
-			want: []Symbol{
+			want: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 5},
 				{Name: "bar", FilePath: "file.go", StartLine: 5, EndLine: 5},
 			},
 		},
 		{
 			name: "Change in an unrelated file",
-			symbols: []Symbol{
+			symbols: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 			},
 			diffContext: map[string][]utils.LineRange{
@@ -87,12 +88,12 @@ func TestFilterAffectedSymbols(t *testing.T) {
 					{Start: 1, Count: 1},
 				},
 			},
-			want: []Symbol{},
+			want: []types.Symbol{},
 		},
 		// New test case to verify the fix for duplicate symbols.
 		{
 			name: "Single symbol with multiple overlapping changes",
-			symbols: []Symbol{
+			symbols: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 			},
 			diffContext: map[string][]utils.LineRange{
@@ -101,7 +102,7 @@ func TestFilterAffectedSymbols(t *testing.T) {
 					{Start: 8, Count: 1}, // Second change inside "foo"
 				},
 			},
-			want: []Symbol{
+			want: []types.Symbol{
 				{Name: "foo", FilePath: "file.go", StartLine: 5, EndLine: 10},
 			},
 		},
