@@ -4,7 +4,7 @@ A local code review agent powered by Ollama that analyzes Git commits to identif
 
 ### Features
 - **Local-Only**: Runs entirely with Ollama - no cloud dependencies
-- **Multi-Language Support**: Analyzes Go and Java code with symbol-aware context
+- **Multi-Language Support**: Analyzes Go, TypeScript, and Java code with symbol-aware context
 - **Git Integration**: Analyzes commits and diffs
 - **Code Quality Analysis**: Identifies potential bugs, security issues, and code smells
 - **Detailed Reports**: Generates comprehensive code review reports
@@ -51,6 +51,7 @@ diffpector --help
 Diffpector provides intelligent symbol analysis for the following languages:
 
 - **Go** (.go files): Functions, methods, types, constants, variables
+- **TypeScript** (.ts, .tsx files): Functions, classes, interfaces, types, enums, methods, properties, variables
 - **Java** (.java files): Classes, interfaces, methods, constructors, fields, constants, enums, annotations
 
 The tool automatically detects the language based on file extensions and provides context-aware analysis including symbol usage tracking and cross-reference detection.

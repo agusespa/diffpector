@@ -22,19 +22,106 @@ type CodeReviewAgent struct {
 	parserRegistry *tools.ParserRegistry
 }
 
-func NewCodeReviewAgent(provider llm.Provider, registry *tools.Registry, cfg *config.Config, parserRegistry *tools.ParserRegistry) *CodeReviewAgent {
+func NewCodeReviewAgent(provider llm.Provider, registry *tools.Registry, cfg *config.Config, parserRegistry *tools.ParserRegistry, promptVariant string) *CodeReviewAgent {
 	return &CodeReviewAgent{
 		llmProvider:    provider,
 		toolRegistry:   registry,
 		config:         cfg,
-		promptVariant:  prompts.DEFAULT_PROMPT,
+		promptVariant:  promptVariant,
 		parserRegistry: parserRegistry,
 	}
+}
+
+
+
+// GenerateReview generates the review and returns the raw LLM response
+func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) (string, error) {
+	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, context)
+	if err != nil {
+		return "", fmt.Errorf("failed to build review prompt: %w", err)
+	}
+
+	spinner := spinner.New("Analyzing changes...")
+	spinner.Start()
+
+	review, err := a.llmProvider.Generate(prompt)
+	spinner.Stop()
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate code review: %w", err)
+	}
+
+	return review, nil
+}
+
+// ProcessAndPrintReview processes the LLM response and prints the results
+func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {
+	issues, err := utils.ParseIssuesFromResponse(review)
+	if err != nil {
+		return fmt.Errorf("failed to parse LLM response: %w", err)
+	}
+
+	if len(issues) == 0 {
+		fmt.Println("---")
+		fmt.Println("✅ Code review passed - no issues found")
+		return nil
+	}
+
+	writeTool := a.toolRegistry.Get(tools.ToolNameWriteFile)
+	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
+
+	reportGen := NewReportGenerator(readTool, writeTool)
+
+	criticalCount, warningCount, minorCount, err := reportGen.GenerateMarkdownReport(issues)
+	if err != nil {
+		return err
+	}
+
+	PrintReviewSummary(criticalCount, warningCount, minorCount)
+
+	return nil
 }
 
 func (a *CodeReviewAgent) ReviewStagedChanges() error {
 	fmt.Println("Starting code review on staged changes...")
 	return a.executeReview()
+}
+
+// ReviewChanges performs code review on provided diff and file contents
+func (a *CodeReviewAgent) ReviewChanges(diff string, fileContents map[string]string, changedFiles []string) error {
+	_, err := a.ReviewChangesWithResult(diff, fileContents, changedFiles, true)
+	return err
+}
+
+// ReviewChangesWithResult performs code review and optionally returns the result
+func (a *CodeReviewAgent) ReviewChangesWithResult(diff string, fileContents map[string]string, changedFiles []string, printResults bool) (string, error) {
+	// Step 1: Validate language support and detect primary language
+	primaryLanguage, err := a.ValidateAndDetectLanguage(changedFiles)
+	if err != nil {
+		return "", err
+	}
+
+	// Step 2: Enhanced context gathering with symbol analysis
+	reviewContext, err := a.GatherEnhancedContextWithFiles(diff, changedFiles, primaryLanguage, fileContents)
+	if err != nil {
+		return "", fmt.Errorf("context gathering failed: %w", err)
+	}
+
+	// Step 3: Generate review using the same process as the main app
+	review, err := a.GenerateReview(reviewContext)
+	if err != nil {
+		return "", fmt.Errorf("generate review failed: %w", err)
+	}
+
+	// Step 4: Optionally process and print results (for CLI usage)
+	if printResults {
+		err = a.ProcessAndPrintReview(review)
+		if err != nil {
+			return review, fmt.Errorf("failed to process review: %w", err)
+		}
+	}
+
+	return review, nil
 }
 
 func (a *CodeReviewAgent) executeReview() error {
@@ -58,14 +145,7 @@ func (a *CodeReviewAgent) executeReview() error {
 		fmt.Printf("\n   ✓ %s", file)
 	}
 
-	// Step 2: Validate language support and detect primary language
-	primaryLanguage, err := a.validateAndDetectLanguage(changedFiles)
-	if err != nil {
-		fmt.Printf("\n   ✕ %v\n", err)
-		return err
-	}
-
-	// Step 3: Get diff for analysis
+	// Step 2: Get diff for analysis
 	diffTool := a.toolRegistry.Get(tools.ToolNameGitDiff)
 
 	diff, err := diffTool.Execute(map[string]any{})
@@ -73,35 +153,31 @@ func (a *CodeReviewAgent) executeReview() error {
 		return fmt.Errorf("failed to get staged diff: %w", err)
 	}
 
-	// Step 4: Enhanced context gathering with symbol analysis
-	fmt.Println()
-	contextSpinner := spinner.New("Analyzing symbols and gathering context...")
-	contextSpinner.Start()
-
-	reviewContext, err := a.GatherEnhancedContext(diff, changedFiles, primaryLanguage)
-	contextSpinner.Stop()
-
+	// Step 3: Read file contents
+	fileContents, err := a.readFileContents(changedFiles)
 	if err != nil {
-		fmt.Printf("Context gathering failed: %v\n", err)
 		return err
 	}
 
-	a.PrintContextSummary(reviewContext)
-	fmt.Println()
-
-	err = a.GenerateReview(reviewContext)
-	if err != nil {
-		fmt.Printf("Generate Review failed: %v\n", err)
-		return err
-	}
-
-	return nil
+	// Step 4: Use the core review logic
+	return a.ReviewChanges(diff, fileContents, changedFiles)
 }
 
 func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []string, primaryLanguage string) (*types.ReviewContext, error) {
-	fileContents, err := a.readFileContents(changedFiles)
-	if err != nil {
-		return nil, err
+	return a.GatherEnhancedContextWithFiles(diff, changedFiles, primaryLanguage, nil)
+}
+
+func (a *CodeReviewAgent) GatherEnhancedContextWithFiles(diff string, changedFiles []string, primaryLanguage string, preloadedFiles map[string]string) (*types.ReviewContext, error) {
+	var fileContents map[string]string
+	var err error
+
+	if preloadedFiles != nil {
+		fileContents = preloadedFiles
+	} else {
+		fileContents, err = a.readFileContents(changedFiles)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	context := &types.ReviewContext{
@@ -162,53 +238,10 @@ func (a *CodeReviewAgent) PrintContextSummary(context *types.ReviewContext) {
 	}
 }
 
-func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) error {
-	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, context)
-	if err != nil {
-		return fmt.Errorf("failed to build review prompt: %w", err)
-	}
 
-	spinner := spinner.New("Analyzing changes...")
-	spinner.Start()
 
-	review, err := a.llmProvider.Generate(prompt)
-	if err != nil {
-		spinner.Stop()
-		return fmt.Errorf("failed to generate code review: %w", err)
-	}
-
-	issues, err := utils.ParseIssuesFromResponse(review)
-	if err != nil {
-		spinner.Stop()
-		return fmt.Errorf("failed to parse LLM response: %w", err)
-	}
-
-	if len(issues) == 0 {
-		fmt.Println("---")
-		fmt.Println("✅ Code review passed - no issues found")
-		spinner.Stop()
-		return nil
-	}
-
-	writeTool := a.toolRegistry.Get(tools.ToolNameWriteFile)
-	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
-
-	reportGen := NewReportGenerator(readTool, writeTool)
-
-	criticalCount, warningCount, minorCount, err := reportGen.GenerateMarkdownReport(issues)
-	if err != nil {
-		return err
-	}
-
-	spinner.Stop()
-
-	PrintReviewSummary(criticalCount, warningCount, minorCount)
-
-	return nil
-}
-
-// validateAndDetectLanguage checks if all programming language files are supported and returns the primary language
-func (a *CodeReviewAgent) validateAndDetectLanguage(changedFiles []string) (string, error) {
+// ValidateAndDetectLanguage checks if all programming language files are supported and returns the primary language
+func (a *CodeReviewAgent) ValidateAndDetectLanguage(changedFiles []string) (string, error) {
 	var primaryLanguage string
 
 	for _, filePath := range changedFiles {

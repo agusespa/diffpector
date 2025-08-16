@@ -8,6 +8,7 @@ import (
 
 	"github.com/agusespa/diffpector/internal/agent"
 	"github.com/agusespa/diffpector/internal/llm"
+	"github.com/agusespa/diffpector/internal/prompts"
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/pkg/config"
 )
@@ -98,7 +99,7 @@ func main() {
 		toolRegistry.Register(name, tool)
 	}
 
-	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg, parserRegistry)
+	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
 
 	if err := codeReviewAgent.ReviewStagedChanges(); err != nil {
 		fmt.Fprintf(os.Stderr, "Code review failed: %v\n", err)

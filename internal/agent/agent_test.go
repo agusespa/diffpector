@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/agusespa/diffpector/internal/prompts"
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/pkg/config"
 )
@@ -104,7 +105,7 @@ func TestValidateAndDetectLanguage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lang, err := agent.validateAndDetectLanguage(tt.files)
+			lang, err := agent.ValidateAndDetectLanguage(tt.files)
 
 			if tt.expectError {
 				if err == nil {
@@ -311,12 +312,12 @@ func doSomething() {
 		response: `[{"severity": "minor", "file_path": "main.go", "start_line": 4, "end_line": 4, "description": "Consider adding error handling"}]`,
 	}
 
-	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry)
+	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
 
 	// Test the main execution flow components
 	t.Run("validate_and_detect_language", func(t *testing.T) {
 		files := []string{"main.go", "utils.go"}
-		lang, err := agent.validateAndDetectLanguage(files)
+		lang, err := agent.ValidateAndDetectLanguage(files)
 		if err != nil {
 			t.Fatalf("Language validation failed: %v", err)
 		}
@@ -391,7 +392,7 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	mockProvider := &mockLLMProvider{}
-	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry)
+	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
 
 	t.Run("read_file_error", func(t *testing.T) {
 		files := []string{"nonexistent.go"}
@@ -469,7 +470,7 @@ func greet(name string) string {
 	}
 
 	cfg := &config.Config{}
-	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry)
+	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
 
 	// Test reading file contents
 	t.Run("read_file_contents_real", func(t *testing.T) {
@@ -539,7 +540,7 @@ index 1234567..abcdefg 100644
 	// Test language validation with real parser registry
 	t.Run("validate_language_real", func(t *testing.T) {
 		files := []string{testFile}
-		lang, err := agent.validateAndDetectLanguage(files)
+		lang, err := agent.ValidateAndDetectLanguage(files)
 		if err != nil {
 			t.Fatalf("Language validation failed: %v", err)
 		}
@@ -569,7 +570,7 @@ func TestContextGatheringWithRealComponents(t *testing.T) {
 	}
 
 	cfg := &config.Config{}
-	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry)
+	agent := NewCodeReviewAgent(mockProvider, registry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
 	testFile := filepath.Join(tempDir, "example.go")
 	testContent := `package example
 
