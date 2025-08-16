@@ -186,15 +186,38 @@ func (g *SymbolContextGatherer) validateFiles(files []string, projectRoot string
 			continue
 		}
 
-		// Convert relative path to absolute path if needed
+		relPath := file
+		if filepath.IsAbs(file) {
+			var err error
+			relPath, err = filepath.Rel(projectRoot, file)
+			if err != nil {
+				relPath = file
+			}
+		}
+
+		// Use language-specific filtering to reduce noise (pass relative path)
+		parser := g.registry.GetParser(relPath)
+		if parser != nil && parser.ShouldExcludeFile(relPath, projectRoot) {
+			continue
+		}
+		
+		// Fallback: exclude obvious test files even if no parser found
+		if strings.HasSuffix(relPath, "_test.go") {
+			continue
+		}
+
+		// Convert to absolute path for final result (needed by other parts of the system)
+		absPath := file
 		if !filepath.IsAbs(file) {
-			file = filepath.Join(projectRoot, file)
+			absPath = filepath.Join(projectRoot, file)
 		}
 
 		// Check if file exists and is readable
-		if _, err := os.Stat(file); err == nil {
-			validFiles = append(validFiles, file)
+		if _, err := os.Stat(absPath); err != nil {
+			continue
 		}
+
+		validFiles = append(validFiles, absPath)
 	}
 
 	return validFiles

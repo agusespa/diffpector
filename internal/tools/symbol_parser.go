@@ -23,6 +23,10 @@ type LanguageParser interface {
 
 	// Language returns the human-readable name of the language this parser handles
 	Language() string
+
+	// ShouldExcludeFile determines if a file should be excluded from symbol context gathering
+	// This allows language-specific filtering (e.g., Go excludes *_test.go, JS excludes node_modules)
+	ShouldExcludeFile(filePath, projectRoot string) bool
 }
 
 type ParserRegistry struct {
@@ -40,9 +44,11 @@ func NewParserRegistry() *ParserRegistry {
 	}
 	registry.RegisterParser(goParser)
 
-	// TODO: Register additional parsers as they become available
-	// javaParser := NewJavaParser()
-	// registry.RegisterParser(javaParser)
+	tsParser, err := NewTypeScriptParser()
+	if err != nil {
+		panic(fmt.Errorf("failed to create TypeScript parser: %w", err))
+	}
+	registry.RegisterParser(tsParser)
 
 	return registry
 }
@@ -84,7 +90,7 @@ func (pr *ParserRegistry) IsKnownLanguage(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	switch ext {
-	case ".go", ".java", ".js", ".ts", ".py", ".rb", ".php",
+	case ".go", ".java", ".js", ".ts", ".tsx", ".py", ".rb", ".php",
 		".cs", ".cpp", ".cc", ".cxx", ".c", ".rs", ".kt",
 		".scala", ".swift":
 		return true

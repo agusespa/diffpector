@@ -76,14 +76,26 @@ index 1234567..abcdefg 100644
 			t.Fatalf("Tool execution failed: %v", err)
 		}
 
-		expectedMessage := "No additional context found for affected symbols."
-		if result != expectedMessage {
-			// If we do find context, it should be properly structured
-			if strings.Contains(result, "Found in:") {
-				t.Logf("Found additional symbol definitions: %s", result)
-			} else {
-				t.Errorf("Expected either no context or properly structured context, got: %s", result)
+		// REQUIREMENT: Should only analyze symbols affected by the actual changed lines
+		// The diff changes lines 8-9 (inside Add function), so only Add should be affected
+		
+		// Validate that we're not getting noise from unrelated symbols
+		if strings.Contains(result, "Multiply") {
+			t.Errorf("REQUIREMENT VIOLATION: Found 'Multiply' symbol but diff only changes 'Add' function. This suggests imprecise symbol filtering.")
+		}
+		
+		// If we find context, validate it's focused and relevant
+		if result != "No additional context found for affected symbols." {
+			if !strings.Contains(result, "Add") {
+				t.Errorf("REQUIREMENT VIOLATION: Expected context about 'Add' function since it was modified, got: %s", result)
 			}
+			
+			// Should be structured properly
+			if !strings.Contains(result, "Found in:") && !strings.Contains(result, "Definition in:") {
+				t.Errorf("Expected properly structured context output, got: %s", result)
+			}
+			
+			t.Logf("Found additional symbol definitions: %s", result)
 		}
 
 		t.Logf("✅ Requirement 1 - Modified symbols found and cross-file usage detected")

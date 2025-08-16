@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -10,12 +11,18 @@ type LineRange struct {
 	Count int
 }
 
-// GetDiffContext extracts the changed line ranges for better context analysis
+// GetDiffContext extracts the actual changed line ranges, not the entire hunk ranges
 func GetDiffContext(diff string) map[string][]LineRange {
+	if diff == "" {
+		return make(map[string][]LineRange)
+	}
+	
 	context := make(map[string][]LineRange)
 	lines := strings.Split(diff, "\n")
 
 	var currentFile string
+	var currentLineNum int
+	changedLines := make(map[string][]int) // Track individual changed line numbers
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "+++") {
@@ -24,10 +31,66 @@ func GetDiffContext(diff string) map[string][]LineRange {
 				currentFile = strings.TrimPrefix(parts[1], "b/")
 			}
 		} else if strings.HasPrefix(line, "@@") && currentFile != "" {
-			if lineRange := ParseHunkHeader(line); lineRange != nil {
-				context[currentFile] = append(context[currentFile], *lineRange)
+			// Parse hunk header to get starting line number for new file
+			if hunkInfo := ParseHunkHeader(line); hunkInfo != nil {
+				currentLineNum = hunkInfo.Start
+			}
+		} else if currentFile != "" && currentLineNum > 0 {
+			if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+				// Added line - this line number is changed
+				changedLines[currentFile] = append(changedLines[currentFile], currentLineNum)
+				currentLineNum++
+			} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+				// Deleted line - the current line position is changed
+				changedLines[currentFile] = append(changedLines[currentFile], currentLineNum)
+				// Don't increment currentLineNum for deleted lines
+			} else if strings.HasPrefix(line, " ") {
+				// Context line - increment line number
+				currentLineNum++
 			}
 		}
+	}
+
+	// Convert individual line numbers to ranges
+	for file, lineNums := range changedLines {
+		if len(lineNums) == 0 {
+			continue
+		}
+
+		// Remove duplicates and sort line numbers
+		uniqueLines := make(map[int]bool)
+		for _, line := range lineNums {
+			uniqueLines[line] = true
+		}
+		
+		sortedLines := make([]int, 0, len(uniqueLines))
+		for line := range uniqueLines {
+			sortedLines = append(sortedLines, line)
+		}
+		sort.Ints(sortedLines)
+
+		// Group consecutive lines into ranges
+		if len(sortedLines) == 0 {
+			continue
+		}
+		
+		start := sortedLines[0]
+		count := 1
+
+		for i := 1; i < len(sortedLines); i++ {
+			if sortedLines[i] == sortedLines[i-1]+1 {
+				// Consecutive line, extend range
+				count++
+			} else {
+				// Gap found, save current range and start new one
+				context[file] = append(context[file], LineRange{Start: start, Count: count})
+				start = sortedLines[i]
+				count = 1
+			}
+		}
+
+		// Add final range
+		context[file] = append(context[file], LineRange{Start: start, Count: count})
 	}
 
 	return context

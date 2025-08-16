@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestNewOllamaProvider(t *testing.T) {
@@ -128,6 +129,10 @@ func TestOllamaProvider_Generate_InvalidJSON(t *testing.T) {
 
 func TestOllamaProvider_Generate_NetworkError(t *testing.T) {
 	provider := NewOllamaProvider("http://invalid-url-that-does-not-exist:12345", "test-model")
+	
+	// Set a short timeout for the test to avoid waiting too long
+	provider.client.Timeout = 100 * time.Millisecond
+	
 	_, err := provider.Generate("test prompt")
 
 	if err == nil {

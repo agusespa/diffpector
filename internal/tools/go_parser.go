@@ -38,6 +38,28 @@ func (gp *GoParser) SitterLanguage() *sitter.Language {
 	return gp.language
 }
 
+func (gp *GoParser) ShouldExcludeFile(filePath, projectRoot string) bool {
+	lowerPath := strings.ToLower(filePath)
+	
+	if strings.HasSuffix(lowerPath, "_test.go") {
+		return true
+	}
+
+	goExcludePatterns := []string{
+		"vendor/",
+		"testdata/",
+		".git/",
+	}
+
+	for _, pattern := range goExcludePatterns {
+		if strings.Contains(lowerPath, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (gp *GoParser) FindSymbolUsages(filePath, content, symbolName string) ([]types.SymbolUsage, error) {
 	src := []byte(content)
 	tree := gp.parser.Parse(src, nil)
