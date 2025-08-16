@@ -10,29 +10,16 @@ import (
 	"github.com/agusespa/diffpector/internal/types"
 )
 
-// Scorer interface for different scoring strategies
-type Scorer interface {
-	Score(expected types.ExpectedResults, actual []types.Issue) float64
-}
-
-// SimpleScorer implements basic scoring logic
-type SimpleScorer struct{}
-
-func NewSimpleScorer() *SimpleScorer {
-	return &SimpleScorer{}
-}
-
-func (s *SimpleScorer) Score(expected types.ExpectedResults, actual []types.Issue) float64 {
-	metrics := []ScoringMetric{
-		&IssueFoundMetric{},
-		&IssueCountMetric{},
-		&SeverityMatchMetric{},
-		&FileMatchMetric{},
+func CalculateScore(expected types.ExpectedResults, actual []types.Issue) float64 {
+	scores := []float64{
+		calculateIssueFoundScore(expected, actual),
+		calculateIssueCountScore(expected, actual),
+		calculateSeverityMatchScore(expected, actual),
+		calculateFileMatchScore(expected, actual),
 	}
 
 	var totalScore, applicableMetrics float64
-	for _, metric := range metrics {
-		score := metric.Calculate(expected, actual)
+	for _, score := range scores {
 		if score >= 0 { // -1 means not applicable
 			totalScore += score
 			applicableMetrics++
@@ -46,15 +33,8 @@ func (s *SimpleScorer) Score(expected types.ExpectedResults, actual []types.Issu
 	return totalScore / applicableMetrics
 }
 
-// ScoringMetric interface for individual scoring components
-type ScoringMetric interface {
-	Calculate(expected types.ExpectedResults, actual []types.Issue) float64
-}
-
-// IssueFoundMetric checks if issues were found when expected
-type IssueFoundMetric struct{}
-
-func (m *IssueFoundMetric) Calculate(expected types.ExpectedResults, actual []types.Issue) float64 {
+// calculateIssueFoundScore checks if issues were found when expected
+func calculateIssueFoundScore(expected types.ExpectedResults, actual []types.Issue) float64 {
 	hasIssues := len(actual) > 0
 	if expected.ShouldFindIssues == hasIssues {
 		return 1.0
@@ -62,10 +42,8 @@ func (m *IssueFoundMetric) Calculate(expected types.ExpectedResults, actual []ty
 	return 0.0
 }
 
-// IssueCountMetric checks if the number of issues is within expected range
-type IssueCountMetric struct{}
-
-func (m *IssueCountMetric) Calculate(expected types.ExpectedResults, actual []types.Issue) float64 {
+// calculateIssueCountScore checks if the number of issues is within expected range
+func calculateIssueCountScore(expected types.ExpectedResults, actual []types.Issue) float64 {
 	if expected.MinIssues == 0 && expected.MaxIssues == 0 {
 		return -1.0 // Not applicable
 	}
@@ -80,10 +58,8 @@ func (m *IssueCountMetric) Calculate(expected types.ExpectedResults, actual []ty
 	return 0.0
 }
 
-// SeverityMatchMetric checks if expected severities are present
-type SeverityMatchMetric struct{}
-
-func (m *SeverityMatchMetric) Calculate(expected types.ExpectedResults, actual []types.Issue) float64 {
+// calculateSeverityMatchScore checks if expected severities are present
+func calculateSeverityMatchScore(expected types.ExpectedResults, actual []types.Issue) float64 {
 	if len(expected.ExpectedSeverity) == 0 {
 		return -1.0 // Not applicable
 	}
@@ -103,10 +79,8 @@ func (m *SeverityMatchMetric) Calculate(expected types.ExpectedResults, actual [
 	return float64(matchCount) / float64(len(expected.ExpectedSeverity))
 }
 
-// FileMatchMetric checks if expected files have issues
-type FileMatchMetric struct{}
-
-func (m *FileMatchMetric) Calculate(expected types.ExpectedResults, actual []types.Issue) float64 {
+// calculateFileMatchScore checks if expected files have issues
+func calculateFileMatchScore(expected types.ExpectedResults, actual []types.Issue) float64 {
 	if len(expected.ExpectedFiles) == 0 {
 		return -1.0 // Not applicable
 	}
@@ -169,6 +143,15 @@ func LoadEvaluationRuns(dir string) ([]types.EvaluationRun, error) {
 			return nil, fmt.Errorf("failed to read result file %s: %w", file, err)
 		}
 
+		// Try to unmarshal as new unified EvaluationResult format first
+		var evalResult types.EvaluationResult
+		if err := json.Unmarshal(data, &evalResult); err == nil && len(evalResult.IndividualRuns) > 0 {
+			// New format - extract individual runs
+			runs = append(runs, evalResult.IndividualRuns...)
+			continue
+		}
+
+		// Fall back to old single EvaluationRun format
 		var run types.EvaluationRun
 		if err := json.Unmarshal(data, &run); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal result file %s: %w", file, err)
@@ -245,5 +228,177 @@ func (rc *RunComparison) PrintComparison() {
 			run.TotalDuration.Seconds(),
 		)
 	}
+	fmt.Println()
+}
+
+// PromptStats holds performance statistics for a prompt variant
+type PromptStats struct {
+	PromptVariant      string
+	Runs               int
+	AverageScore       float64
+	ScoreStdDev        float64
+	AverageSuccessRate float64
+	FalsePositiveRate  float64
+	TestCaseBreakdown  map[string]float64 // test case name -> average score
+}
+
+// ComparePrompts analyzes and compares different prompt variants
+func ComparePrompts(resultsDir string) error {
+	runs, err := LoadEvaluationRuns(resultsDir)
+	if err != nil {
+		return fmt.Errorf("failed to load evaluation runs: %w", err)
+	}
+
+	if len(runs) == 0 {
+		fmt.Println("No evaluation results found in", resultsDir)
+		return nil
+	}
+
+	// Group runs by model, then by prompt variant
+	modelGroups := make(map[string][]types.EvaluationRun)
+	for _, run := range runs {
+		modelGroups[run.Model] = append(modelGroups[run.Model], run)
+	}
+
+	// Process each model separately
+	for model, modelRuns := range modelGroups {
+		comparePromptsForModel(model, modelRuns)
+	}
+
+	return nil
+}
+
+func comparePromptsForModel(model string, modelRuns []types.EvaluationRun) {
+
+	// Group runs by prompt variant
+	promptGroups := make(map[string][]types.EvaluationRun)
+	for _, run := range modelRuns {
+		promptGroups[run.PromptVariant] = append(promptGroups[run.PromptVariant], run)
+	}
+
+	// Calculate stats for each prompt
+	var promptStats []PromptStats
+	for promptName, runs := range promptGroups {
+		stats := calculatePromptStats(promptName, runs)
+		promptStats = append(promptStats, stats)
+	}
+
+	// Sort by average score
+	sort.Slice(promptStats, func(i, j int) bool {
+		return promptStats[i].AverageScore > promptStats[j].AverageScore
+	})
+
+	printPromptComparison(model, promptStats)
+}
+
+func calculatePromptStats(promptName string, runs []types.EvaluationRun) PromptStats {
+	if len(runs) == 0 {
+		return PromptStats{PromptVariant: promptName}
+	}
+
+	var scores, successRates []float64
+	var falsePositives int
+	totalCleanRefactorTests := 0
+	testCaseScores := make(map[string][]float64)
+
+	for _, run := range runs {
+		scores = append(scores, run.AverageScore)
+		successRates = append(successRates, run.SuccessRate)
+
+		// Analyze individual test cases
+		for _, result := range run.Results {
+			testName := result.TestCase.Name
+			testCaseScores[testName] = append(testCaseScores[testName], result.Score)
+
+			// Check for false positives in clean_refactor test
+			if testName == "clean_refactor" {
+				totalCleanRefactorTests++
+				if len(result.Issues) > 0 {
+					falsePositives++
+				}
+			}
+		}
+	}
+
+	// Calculate test case averages
+	calc := NewStatisticsCalculator()
+	testCaseBreakdown := make(map[string]float64)
+	for testName, scores := range testCaseScores {
+		testCaseBreakdown[testName] = calc.CalculateMean(scores)
+	}
+
+	falsePositiveRate := 0.0
+	if totalCleanRefactorTests > 0 {
+		falsePositiveRate = float64(falsePositives) / float64(totalCleanRefactorTests)
+	}
+
+	return PromptStats{
+		PromptVariant:      promptName,
+		Runs:               len(runs),
+		AverageScore:       calc.CalculateMean(scores),
+		ScoreStdDev:        calc.CalculateStdDev(scores),
+		AverageSuccessRate: calc.CalculateMean(successRates),
+		FalsePositiveRate:  falsePositiveRate,
+		TestCaseBreakdown:  testCaseBreakdown,
+	}
+}
+
+func printPromptComparison(model string, promptStats []PromptStats) {
+	fmt.Printf("\n=== Prompt Comparison for Model: %s ===\n", model)
+
+	if len(promptStats) == 0 {
+		fmt.Println("No prompt results to compare.")
+		return
+	}
+
+	// Overall ranking
+	fmt.Println("\n🏆 Prompt Performance Ranking:")
+	for i, stats := range promptStats {
+		fmt.Printf("  %d. %s: %.3f (±%.3f) | Success: %.1f%% | FP Rate: %.1f%% | Runs: %d\n",
+			i+1, stats.PromptVariant, stats.AverageScore, stats.ScoreStdDev,
+			stats.AverageSuccessRate, stats.FalsePositiveRate*100, stats.Runs)
+	}
+
+	// Test case breakdown for top prompts
+	if len(promptStats) >= 2 {
+		fmt.Println("\n📊 Test Case Performance (Top 2 Prompts):")
+
+		// Get all test case names
+		testCases := make(map[string]bool)
+		for _, stats := range promptStats[:2] {
+			for testName := range stats.TestCaseBreakdown {
+				testCases[testName] = true
+			}
+		}
+
+		// Sort test case names for consistent output
+		var sortedTestCases []string
+		for testName := range testCases {
+			sortedTestCases = append(sortedTestCases, testName)
+		}
+		sort.Strings(sortedTestCases)
+
+		for _, testName := range sortedTestCases {
+			fmt.Printf("  %s:\n", testName)
+			for _, stats := range promptStats[:2] {
+				if score, exists := stats.TestCaseBreakdown[testName]; exists {
+					fmt.Printf("    %s: %.3f\n", stats.PromptVariant, score)
+				}
+			}
+		}
+	}
+
+	// Recommendations
+	if len(promptStats) >= 2 {
+		best := promptStats[0]
+		fmt.Printf("\n💡 Recommendation: Use '%s' prompt\n", best.PromptVariant)
+		fmt.Printf("   - Highest average score: %.3f\n", best.AverageScore)
+		if best.FalsePositiveRate == 0 {
+			fmt.Printf("   - No false positives detected\n")
+		} else {
+			fmt.Printf("   - False positive rate: %.1f%%\n", best.FalsePositiveRate*100)
+		}
+	}
+
 	fmt.Println()
 }

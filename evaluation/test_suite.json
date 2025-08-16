@@ -113,10 +113,40 @@
         "should_find_issues": true,
         "expected_severity": ["MINOR"],
         "min_issues": 1,
-        "max_issues": 5
+        "max_issues": 6
       },
       "metadata": {
         "category": "style",
+        "language": "go"
+      }
+    },
+    {
+      "name": "complex_security_multi",
+      "description": "Test detection of multiple security issues in one file",
+      "diff_file": "complex_security.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL"],
+        "min_issues": 2,
+        "max_issues": 5
+      },
+      "metadata": {
+        "category": "security",
+        "language": "go"
+      }
+    },
+    {
+      "name": "performance_inefficient_loops",
+      "description": "Test detection of inefficient algorithms and N+1 patterns",
+      "diff_file": "inefficient_loops.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 2,
+        "max_issues": 4
+      },
+      "metadata": {
+        "category": "performance",
         "language": "go"
       }
     }

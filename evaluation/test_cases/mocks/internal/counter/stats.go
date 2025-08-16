@@ -1,45 +1,34 @@
+//go:build ignore
+
 package counter
 
 import (
 	"sync"
-	"time"
 )
 
 type StatsCounter struct {
-	mu    sync.Mutex
 	count int64
-	data  map[string]int
+	mutex sync.RWMutex
 }
 
 func NewStatsCounter() *StatsCounter {
-	return &StatsCounter{
-		data: make(map[string]int),
-	}
+	return &StatsCounter{}
 }
 
-// This function has a race condition - it reads and writes shared data without proper locking
-func (s *StatsCounter) IncrementAsync(key string) {
-	go func() {
-		// Race condition: accessing shared data without mutex
-		current := s.data[key]
-		time.Sleep(time.Millisecond) // Simulate some work
-		s.data[key] = current + 1
-		s.count++
-	}()
+func (s *StatsCounter) Increment() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.count++
 }
 
-func (s *StatsCounter) GetCount() int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *StatsCounter) Get() int64 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 	return s.count
 }
 
-func (s *StatsCounter) GetData() map[string]int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	result := make(map[string]int)
-	for k, v := range s.data {
-		result[k] = v
-	}
-	return result
+func (s *StatsCounter) Reset() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.count = 0
 }

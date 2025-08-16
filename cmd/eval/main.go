@@ -13,13 +13,13 @@ import (
 
 func main() {
 	var (
-		suiteFile   = flag.String("suite", "evaluation/test_suite.json", "Path to evaluation test suite")
-		resultsDir  = flag.String("results", "evaluation/results", "Directory to store results")
-		configFile  = flag.String("config", "evaluation/model_configs.json", "Path to evaluation config file")
-		variant     = flag.String("variant", "", "Variant Key of the specific configuration to run from the config file")
-		compare     = flag.Bool("compare", false, "Compare existing results instead of running new evaluation")
-		listPrompts = flag.Bool("list-prompts", false, "List available prompt variants")
-		showHelp    = flag.Bool("help", false, "Show help message")
+		suiteFile      = flag.String("suite", "evaluation/test_suite.json", "Path to evaluation test suite")
+		resultsDir     = flag.String("results", "evaluation/results", "Directory to store results")
+		configFile     = flag.String("config", "evaluation/model_configs.json", "Path to evaluation config file")
+		variant        = flag.String("variant", "", "Variant Key of the specific configuration to run from the config file")
+		compare        = flag.Bool("compare", false, "Compare existing results instead of running new evaluation")
+		comparePrompts = flag.Bool("compare-prompts", false, "Compare prompt variants")
+		listPrompts    = flag.Bool("list-prompts", false, "List available prompt variants")
 	)
 	flag.Parse()
 
@@ -28,11 +28,6 @@ func main() {
 	fmt.Println(" Diffpector Evaluation Tool ")
 	fmt.Println("============================")
 	fmt.Println("")
-
-	if *showHelp {
-		printHelp()
-		return
-	}
 
 	if *listPrompts {
 		printPromptVariants()
@@ -47,6 +42,19 @@ func main() {
 		return
 	}
 
+	if *comparePrompts {
+		if err := evaluation.ComparePrompts(*resultsDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error comparing prompts: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *variant == "" {
+		printHelp()
+		return
+	}
+
 	if err := runEvaluation(*suiteFile, *resultsDir, *configFile, *variant); err != nil {
 		fmt.Fprintf(os.Stderr, "Error running evaluation: %v\n", err)
 		os.Exit(1)
@@ -54,7 +62,7 @@ func main() {
 }
 
 func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
-	configs, err := evaluation.LoadEvaluationConfigs(configFile)
+	configs, err := evaluation.LoadConfigs(configFile)
 	if err != nil {
 		return fmt.Errorf("failed to load evaluation configs: %w", err)
 	}
@@ -65,24 +73,34 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
 	}
 
 	for _, config := range configs {
-		if variantKey != "" && config.Variant != variantKey {
+		if variantKey != "" && config.Key != variantKey {
 			continue
 		}
-		fmt.Printf("---"+" Running Configuration: %s ---", config.Variant)
+		fmt.Printf("--- Running Configuration: %s ---\n", config.Key)
+		if config.Description != "" {
+			fmt.Printf("    %s\n", config.Description)
+		}
+
+		// Use config runs, default to 1 if not specified
+		configRuns := config.Runs
+		if configRuns == 0 {
+			configRuns = 1
+		}
+
 		for _, model := range config.Models {
 			for _, prompt := range config.Prompts {
-				runSingleEvaluation(evaluator, config.Provider, model, prompt, config.BaseURL)
+				runSingleEvaluation(evaluator, config.Provider, model, prompt, config.BaseURL, configRuns)
 			}
 		}
 	}
 
 	fmt.Println("All evaluations complete.")
-	fmt.Printf("To compare results, run: %s --compare --results %s\n", os.Args[0], resultsDir)
+	fmt.Println("To compare results, run: make eval-compare-{prompts/models}")
 
 	return nil
 }
 
-func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, prompt, baseURL string) {
+func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, prompt, baseURL string, runs int) {
 	model = strings.TrimSpace(model)
 	prompt = strings.TrimSpace(prompt)
 
@@ -99,31 +117,32 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, promp
 		BaseURL: baseURL,
 	}
 
-	run, err := evaluator.RunEvaluation(llmConfig, prompt)
+	// Run evaluation
+	result, err := evaluator.RunEvaluation(llmConfig, prompt, runs)
 	if err != nil {
 		fmt.Printf("Error running evaluation for %s/%s: %v\n", model, prompt, err)
 		return
 	}
 
-	evaluation.PrintSummary(run)
+	if runs == 1 {
+		// For single runs, print the individual run summary
+		if len(result.IndividualRuns) > 0 {
+			evaluation.PrintSummary(&result.IndividualRuns[0])
+		}
+	} else {
+		// For multiple runs, print evaluation summary
+		evaluation.PrintEvaluationSummary(result)
+	}
 
-	if err := evaluator.SaveResults(run); err != nil {
+	// Save results
+	if err := evaluator.SaveEvaluationResults(result); err != nil {
 		fmt.Printf("Warning: failed to save results: %v\n", err)
 	}
 	fmt.Println()
 }
 
 func printHelp() {
-	fmt.Println("Usage:")
-	fmt.Printf("  %s [options]\n", os.Args[0])
-	fmt.Println()
-	fmt.Println("Options:")
-	flag.PrintDefaults()
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Printf("  %s --config evaluation/model_configs.json --variant quick-sanity-check\n", os.Args[0])
-	fmt.Printf("  %s --compare\n", os.Args[0])
-	fmt.Printf("  %s --list-prompts\n", os.Args[0])
+	fmt.Println("Use 'make eval-help' to see available evaluation commands")
 }
 
 func printPromptVariants() {

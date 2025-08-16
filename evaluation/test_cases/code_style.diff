@@ -2,7 +2,7 @@ diff --git a/internal/helper/format.go b/internal/helper/format.go
 index 1234567..abcdefg 100644
 --- a/internal/helper/format.go
 +++ b/internal/helper/format.go
-@@ -8,20 +8,20 @@ import (
+@@ -8,20 +8,25 @@ import (
  
  // formatUserName formats a user's name for display
  func formatUserName(firstName, lastName string) string {
@@ -26,8 +26,13 @@ index 1234567..abcdefg 100644
  
 -// Helper function with unclear name
 -func process(data interface{}) interface{} {
-+// x processes stuff
++func validateEmail(email string) bool {
++	return strings.Contains(email, "@")
++}
++
++// Helper function
 +func x(d interface{}) interface{} {
 +	// TODO: implement this
  	return data
++	fmt.Println("unreachable")
  }

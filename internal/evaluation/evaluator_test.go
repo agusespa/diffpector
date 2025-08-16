@@ -2,28 +2,36 @@ package evaluation
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agusespa/diffpector/internal/types"
 )
 
-type mockProvider struct{}
+type mockProvider struct {
+	response string
+	err      error
+}
 
 func (m *mockProvider) GetModel() string {
 	return "mock-model"
 }
 
 func (m *mockProvider) Generate(prompt string) (string, error) {
-	return "APPROVED", nil
+	if m.err != nil {
+		return "", m.err
+	}
+	return m.response, nil
 }
 
 func (m *mockProvider) SetModel(model string) {
-	// TODO Mock implementation
+	// Mock implementation
 }
 
-func TestRunEvaluation(t *testing.T) {
+func TestNewEvaluator(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "test-eval-")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -35,7 +43,7 @@ func TestRunEvaluation(t *testing.T) {
 			{
 				Name:        "Test Case 1",
 				Description: "A simple test case",
-				DiffFile:    "", // No diff file for simplicity
+				DiffFile:    "",
 				Expected:    types.ExpectedResults{ShouldFindIssues: false},
 			},
 		},
@@ -43,24 +51,242 @@ func TestRunEvaluation(t *testing.T) {
 	}
 
 	suiteFilePath := filepath.Join(tempDir, "test_suite.json")
-	suiteFile, err := os.Create(suiteFilePath)
+	suiteData, _ := json.Marshal(testSuite)
+	err = os.WriteFile(suiteFilePath, suiteData, 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test suite file: %v", err)
 	}
-	if err := json.NewEncoder(suiteFile).Encode(testSuite); err != nil {
-		t.Fatalf("Failed to write to test suite file: %v", err)
-	}
-	suiteFile.Close()
 
 	evaluator, err := NewEvaluator(suiteFilePath, tempDir)
 	if err != nil {
 		t.Fatalf("Failed to create evaluator: %v", err)
 	}
 
-	provider := &mockProvider{}
-
-	_, err = evaluator.runSingleTest(testSuite.TestCases[0], provider, "default")
-	if err != nil {
-		t.Errorf("runSingleTest() failed: %v", err)
+	if evaluator.suite == nil {
+		t.Error("Expected suite to be loaded")
 	}
+
+	if evaluator.resultsMgr == nil {
+		t.Error("Expected results manager to be initialized")
+	}
+}
+
+func TestNewEvaluator_InvalidSuiteFile(t *testing.T) {
+	_, err := NewEvaluator("nonexistent.json", "/tmp")
+	if err == nil {
+		t.Error("Expected error for nonexistent suite file")
+	}
+}
+
+func TestRunSingleTest_ApprovedResponse(t *testing.T) {
+	tempDir, mockFiles := setupTestEnvironment(t)
+	defer os.RemoveAll(tempDir)
+
+	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
+	provider := &mockProvider{response: "APPROVED"}
+
+	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	if err != nil {
+		t.Fatalf("runSingleTest() failed: %v", err)
+	}
+
+	if !result.Success {
+		t.Error("Expected success to be true")
+	}
+
+	if len(result.Issues) != 0 {
+		t.Errorf("Expected 0 issues, got %d", len(result.Issues))
+	}
+
+	if result.Score != 1.0 {
+		t.Errorf("Expected score 1.0 for approved response, got %f", result.Score)
+	}
+}
+
+func TestRunSingleTest_JSONResponse(t *testing.T) {
+	tempDir, mockFiles := setupTestEnvironment(t)
+	defer os.RemoveAll(tempDir)
+
+	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
+
+	jsonResponse := `[
+		{
+			"severity": "CRITICAL",
+			"file_path": "test.go",
+			"start_line": 10,
+			"end_line": 12,
+			"description": "SQL injection vulnerability"
+		}
+	]`
+
+	provider := &mockProvider{response: jsonResponse}
+
+	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	if err != nil {
+		t.Fatalf("runSingleTest() failed: %v", err)
+	}
+
+	if !result.Success {
+		t.Error("Expected success to be true")
+	}
+
+	if len(result.Issues) != 1 {
+		t.Errorf("Expected 1 issue, got %d", len(result.Issues))
+	}
+
+	issue := result.Issues[0]
+	if issue.Severity != "CRITICAL" {
+		t.Errorf("Expected severity CRITICAL, got %s", issue.Severity)
+	}
+
+	if issue.Description != "SQL injection vulnerability" {
+		t.Errorf("Expected specific description, got %s", issue.Description)
+	}
+}
+
+func TestRunSingleTest_MalformedResponse(t *testing.T) {
+	tempDir, mockFiles := setupTestEnvironment(t)
+	defer os.RemoveAll(tempDir)
+
+	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
+
+	// Response that starts with text but contains JSON
+	malformedResponse := `The code looks good overall, but I found some issues:
+	[
+		{
+			"severity": "WARNING",
+			"file_path": "test.go",
+			"start_line": 5,
+			"end_line": 5,
+			"description": "Missing error handling"
+		}
+	]`
+
+	provider := &mockProvider{response: malformedResponse}
+
+	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	if err != nil {
+		t.Fatalf("runSingleTest() failed: %v", err)
+	}
+
+	if !result.Success {
+		t.Error("Expected success to be true")
+	}
+
+	if len(result.Issues) != 1 {
+		t.Errorf("Expected 1 issue, got %d", len(result.Issues))
+	}
+}
+
+func TestRunSingleTest_FormatViolation(t *testing.T) {
+	tempDir, mockFiles := setupTestEnvironment(t)
+	defer os.RemoveAll(tempDir)
+
+	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
+
+	// Response that violates the expected format
+	formatViolationResponse := "As a code reviewer, I will focus on reviewing only the code changes shown in the diff above. Here are my findings:"
+
+	provider := &mockProvider{response: formatViolationResponse}
+
+	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	if err != nil {
+		t.Fatalf("runSingleTest() failed: %v", err)
+	}
+
+	// Format violations should be marked as failures
+	if result.Success {
+		t.Error("Expected success to be false for format violation")
+	}
+
+	if len(result.Issues) != 0 {
+		t.Errorf("Expected 0 issues for format violation (couldn't parse), got %d", len(result.Issues))
+	}
+
+	// Format violations should get zero score
+	if result.Score != 0.0 {
+		t.Errorf("Expected score 0.0 for format violation, got %f", result.Score)
+	}
+
+	// Should have an error message about format violation
+	if len(result.Errors) == 0 {
+		t.Error("Expected error message for format violation")
+	} else if !strings.Contains(result.Errors[0], "Format violation") {
+		t.Errorf("Expected format violation error, got: %s", result.Errors[0])
+	}
+}
+
+func TestRunSingleTest_ProviderError(t *testing.T) {
+	tempDir, mockFiles := setupTestEnvironment(t)
+	defer os.RemoveAll(tempDir)
+
+	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
+	provider := &mockProvider{err: errors.New("provider error")}
+
+	_, err := evaluator.runSingleTest(testCase, provider, "default")
+	if err == nil {
+		t.Error("Expected error when provider fails")
+	}
+
+	if !strings.Contains(err.Error(), "agent review failed") {
+		t.Errorf("Expected 'agent review failed' in error, got: %v", err)
+	}
+}
+
+// Helper functions for test setup
+
+func setupTestEnvironment(t *testing.T) (string, string) {
+	tempDir, err := os.MkdirTemp("", "test-eval-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	// Create mock files directory
+	mockFiles := filepath.Join(tempDir, "mock_files")
+	err = os.MkdirAll(mockFiles, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock files dir: %v", err)
+	}
+
+	// Create a test file
+	testFileContent := "package main\n\nfunc main() {\n\tprintln(\"Hello, World!\")\n}\n"
+	err = os.WriteFile(filepath.Join(mockFiles, "test.go"), []byte(testFileContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	return tempDir, mockFiles
+}
+
+func createTestEvaluator(t *testing.T, tempDir, mockFiles string) (*Evaluator, types.TestCase) {
+	testSuite := &types.EvaluationSuite{
+		TestCases: []types.TestCase{
+			{
+				Name:        "Test Case 1",
+				Description: "A simple test case",
+				DiffFile:    "",
+				Expected: types.ExpectedResults{
+					ShouldFindIssues: false,
+					MinIssues:        0,
+					MaxIssues:        5,
+				},
+			},
+		},
+		BaseDir:      tempDir,
+		MockFilesDir: mockFiles,
+	}
+
+	suiteFilePath := filepath.Join(tempDir, "test_suite.json")
+	suiteData, _ := json.Marshal(testSuite)
+	err := os.WriteFile(suiteFilePath, suiteData, 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test suite file: %v", err)
+	}
+
+	evaluator, err := NewEvaluator(suiteFilePath, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to create evaluator: %v", err)
+	}
+
+	return evaluator, testSuite.TestCases[0]
 }

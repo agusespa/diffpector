@@ -1,15 +1,17 @@
 [
   {
     "key": "prompt-comparison",
-    "description": "Tests one fast model against all prompts to validate changes.",
+    "description": "Tests default model against all prompts to validate changes.",
     "provider": "ollama",
     "base_url": "http://localhost:11434",
     "models": [
-      "qwen2.5-coder:7b"
+      "qwen2.5-coder:14b"
     ],
     "prompts": [
-      "default"
-    ]
+      "optimized",
+      "optimized-v2"
+    ],
+    "runs": 3
   },
   {
     "key": "model-comparison",
@@ -19,13 +21,15 @@
     "models": [
       "qwen2.5-coder:7b",
       "qwen2.5-coder:14b",
-      "codellama",
-      "llama3.1",
-      "mistral"
+      "codellama:13b",
+      "llama3.1:8b",
+      "qwen3:8b",
+      "qwen3:14b"
     ],
     "prompts": [
-      "default"
-    ]
+      "optimized"
+    ],
+    "runs": 3
   },
   {
     "key": "full-comprehensive",
@@ -39,7 +43,8 @@
     ],
     "prompts": [
       "default",
-      "detailed"
-    ]
+      "optimized"
+    ],
+    "runs": 3
   }
 ]

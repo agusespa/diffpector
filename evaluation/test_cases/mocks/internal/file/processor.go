@@ -1,10 +1,11 @@
+//go:build ignore
+
 package file
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
-	"strings"
 )
 
 type ProcessResult struct {
@@ -13,7 +14,7 @@ type ProcessResult struct {
 	Errors         []string
 }
 
-// This function has missing error handling
+// This function has proper error handling (before state)
 func ProcessFile(filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -21,39 +22,31 @@ func ProcessFile(filename string) error {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	lineCount := 0
-	
-	for scanner.Scan() {
-		line := scanner.Text()
-		lineCount++
-		
-		// Missing error handling - this could fail
-		processLine(line)
-		
-		// Missing error handling - this could also fail
-		words := strings.Fields(line)
-		for _, word := range words {
-			validateWord(word)
-		}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Missing error handling for scanner errors
-	fmt.Printf("Processed %d lines\n", lineCount)
+	processed := processData(data)
+
+	if err := writeToCache(filename, processed); err != nil {
+		return fmt.Errorf("failed to write to cache: %w", err)
+	}
+
 	return nil
 }
 
-func processLine(line string) error {
-	if len(line) > 1000 {
-		return fmt.Errorf("line too long: %d characters", len(line))
-	}
-	// Simulate processing that could fail
+func processData(data []byte) []byte {
+	// Simulate data processing
+	return data
+}
+
+func writeToCache(filename string, data []byte) error {
+	// Simulate cache writing that could fail
 	return nil
 }
 
-func validateWord(word string) error {
-	if strings.Contains(word, "invalid") {
-		return fmt.Errorf("invalid word found: %s", word)
-	}
+func sendToAnalytics(filename string, size int) error {
+	// Simulate analytics call that could fail
 	return nil
 }

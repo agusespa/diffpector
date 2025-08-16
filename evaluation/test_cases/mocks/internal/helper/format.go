@@ -1,47 +1,29 @@
+//go:build ignore
+
 package helper
 
 import (
 	"fmt"
-	"strings"
 )
 
-// FormatUserName formats a user's name with poor style choices
-func FormatUserName(firstName, lastName string) string {
-	if firstName=="" {
+// formatUserName formats a user's name for display
+func formatUserName(firstName, lastName string) string {
+	if firstName == "" && lastName == "" {
+		return "Anonymous"
+	}
+
+	if firstName == "" {
 		return lastName
 	}
-	if lastName=="" {
+
+	if lastName == "" {
 		return firstName
 	}
-	
-	// Poor formatting and inconsistent spacing
-	result:=fmt.Sprintf("%s %s",firstName,lastName)
-	return strings.TrimSpace(result)
+
+	return fmt.Sprintf("%s %s", firstName, lastName)
 }
 
-// FormatAddress has inconsistent formatting and poor variable naming
-func FormatAddress(street,city,state,zip string) string {
-	var result string
-	if street!="" {
-		result+=street
-	}
-	if city!="" {
-		if result!="" {
-			result+=", "
-		}
-		result+=city
-	}
-	if state!="" {
-		if result!="" {
-			result+=", "
-		}
-		result+=state
-	}
-	if zip!="" {
-		if result!="" {
-			result+=" "
-		}
-		result+=zip
-	}
-	return result
+// Helper function with unclear name
+func process(data interface{}) interface{} {
+	return data
 }

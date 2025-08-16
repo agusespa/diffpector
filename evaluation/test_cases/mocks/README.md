@@ -25,5 +25,5 @@ mocks/
 To add mock content for a new test case:
 
 1. Create the file using the exact same path as referenced in your diff file
-2. Include realistic code with the issues you want to test for
+2. Include realistic baseline code for comparison
 3. The evaluator will automatically use this content

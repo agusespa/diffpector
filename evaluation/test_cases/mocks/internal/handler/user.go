@@ -1,3 +1,5 @@
+//go:build ignore
+
 package handler
 
 import (
@@ -7,13 +9,19 @@ import (
 )
 
 type User struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID      int      `json:"id"`
+	Name    string   `json:"name"`
+	Email   string   `json:"email"`
+	Profile *Profile `json:"profile"`
+}
+
+type Profile struct {
+	Bio       string `json:"bio"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 type UserService interface {
-	GetUserByID(id int) (*User, error)
+	GetByID(id int) (*User, error)
 }
 
 type UserHandler struct {
@@ -26,7 +34,8 @@ func NewUserHandler(userService UserService) *UserHandler {
 	}
 }
 
-// This function has nil pointer dereference issues
+// GetUser handles user retrieval with proper error handling (before state)
+// This is the SAFE implementation that checks for both errors and nil users
 func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
@@ -34,20 +43,25 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(idStr)
+	userID, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "invalid id parameter", http.StatusBadRequest)
 		return
 	}
 
-	// Potential nil pointer dereference - userService could be nil
-	user, err := h.userService.GetUserByID(id)
+	// IMPORTANT: This service call can return (nil, nil) for non-existent users
+	user, err := h.userService.GetByID(userID)
 	if err != nil {
-		http.Error(w, "failed to get user", http.StatusInternalServerError)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// Another potential nil pointer dereference - user could be nil
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	if user == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }

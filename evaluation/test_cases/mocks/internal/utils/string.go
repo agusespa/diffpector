@@ -1,3 +1,5 @@
+//go:build ignore
+
 package utils
 
 import (
@@ -34,15 +36,15 @@ func (v *StringValidator) ValidateEmail(email string) error {
 	if len(email) == 0 {
 		return fmt.Errorf("email cannot be empty")
 	}
-	
+
 	if len(email) > v.maxLength {
 		return fmt.Errorf("email too long: maximum %d characters", v.maxLength)
 	}
-	
+
 	if !v.patterns["email"].MatchString(email) {
 		return fmt.Errorf("invalid email format")
 	}
-	
+
 	return nil
 }
 
@@ -51,15 +53,15 @@ func (v *StringValidator) ValidateUsername(username string) error {
 	if len(username) < 3 {
 		return fmt.Errorf("username too short: minimum 3 characters")
 	}
-	
+
 	if len(username) > 20 {
 		return fmt.Errorf("username too long: maximum 20 characters")
 	}
-	
+
 	if !v.patterns["username"].MatchString(username) {
 		return fmt.Errorf("username contains invalid characters")
 	}
-	
+
 	return nil
 }
 
@@ -72,16 +74,16 @@ func SanitizeInput(input string) string {
 		}
 		return r
 	}, input)
-	
+
 	// Trim whitespace
 	cleaned = strings.TrimSpace(cleaned)
-	
+
 	// Remove potential SQL injection patterns (basic)
 	dangerous := []string{"'", "\"", ";", "--", "/*", "*/", "xp_", "sp_"}
 	for _, pattern := range dangerous {
 		cleaned = strings.ReplaceAll(cleaned, pattern, "")
 	}
-	
+
 	return cleaned
 }
 
@@ -90,12 +92,12 @@ func GenerateSecureToken(length int) (string, error) {
 	if length <= 0 {
 		return "", fmt.Errorf("token length must be positive")
 	}
-	
+
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	return hex.EncodeToString(bytes), nil
 }
 
@@ -104,7 +106,7 @@ func TruncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	
+
 	// Try to break at word boundary
 	if maxLen > 3 {
 		truncated := s[:maxLen-3]
@@ -112,7 +114,7 @@ func TruncateString(s string, maxLen int) string {
 			return truncated[:lastSpace] + "..."
 		}
 	}
-	
+
 	return s[:maxLen-3] + "..."
 }
 
@@ -121,7 +123,7 @@ func ParseCSV(line string) []string {
 	var result []string
 	var current strings.Builder
 	inQuotes := false
-	
+
 	for i, char := range line {
 		switch char {
 		case '"':
@@ -143,7 +145,7 @@ func ParseCSV(line string) []string {
 			current.WriteRune(char)
 		}
 	}
-	
+
 	result = append(result, current.String())
 	return result
 }

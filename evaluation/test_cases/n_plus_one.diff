@@ -2,16 +2,35 @@ diff --git a/internal/service/order.go b/internal/service/order.go
 index 1234567..abcdefg 100644
 --- a/internal/service/order.go
 +++ b/internal/service/order.go
-@@ -20,15 +20,18 @@ func (s *OrderService) GetOrdersWithItems(userID int) ([]OrderWithItems, error
+@@ -15,20 +15,30 @@ type OrderService struct {
+ 	db Database
+ }
+ 
+-func (s *OrderService) GetOrdersWithItems(userID int) ([]OrderWithItems, error) {
++func (s *OrderService) GetOrdersWithItemsOld(userID int) ([]OrderWithItems, error) {
+ 	orders, err := s.db.GetOrdersByUserID(userID)
+ 	if err != nil {
  		return nil, err
  	}
  	
 -	var result []OrderWithItems
++	items, err := s.db.GetAllOrderItems(orders)
++	if err != nil {
++		return nil, err
++	}
++	
++	return s.combineOrdersAndItems(orders, items), nil
++}
++
++func (s *OrderService) GetOrdersWithItems(userID int) ([]OrderWithItems, error) {
++	orders, err := s.db.GetOrdersByUserID(userID)
++	if err != nil {
++		return nil, err
++	}
++	
 +	result := make([]OrderWithItems, len(orders))
  	for i, order := range orders {
--		items, err := s.db.GetOrderItems(order.ID)
-+		// Get items for each order individually
-+		items, err := s.getItemsForOrder(order.ID)
+ 		items, err := s.db.GetOrderItems(order.ID)
  		if err != nil {
  			return nil, err
  		}
@@ -24,8 +43,4 @@ index 1234567..abcdefg 100644
  	}
  	
  	return result, nil
-+}
-+
-+func (s *OrderService) getItemsForOrder(orderID int) ([]Item, error) {
-+	return s.db.Query("SELECT * FROM order_items WHERE order_id = ?", orderID)
  }

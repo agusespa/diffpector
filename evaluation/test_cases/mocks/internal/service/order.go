@@ -1,3 +1,5 @@
+//go:build ignore
+
 package service
 
 type Order struct {
@@ -23,6 +25,7 @@ type OrderWithItems struct {
 type Database interface {
 	GetOrdersByUserID(userID int) ([]Order, error)
 	GetOrderItems(orderID int) ([]Item, error)
+	GetAllOrderItems(orders []Order) (map[int][]Item, error)
 	Query(query string, args ...any) ([]Item, error)
 }
 
@@ -34,25 +37,37 @@ func NewOrderService(db Database) *OrderService {
 	return &OrderService{db: db}
 }
 
-// This function has an N+1 query problem - it queries the database once per order
+// GetOrdersWithItems loads orders with their associated items
 func (s *OrderService) GetOrdersWithItems(userID int) ([]OrderWithItems, error) {
 	orders, err := s.db.GetOrdersByUserID(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []OrderWithItems
-	for _, order := range orders {
-		// N+1 problem: This executes a separate query for each order
-		items, err := s.db.GetOrderItems(order.ID)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, OrderWithItems{
+	// Batch loading of all items
+	allItems, err := s.db.GetAllOrderItems(orders)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]OrderWithItems, len(orders))
+	for i, order := range orders {
+		result[i] = OrderWithItems{
 			Order: order,
-			Items: items,
-		})
+			Items: allItems[order.ID],
+		}
 	}
 
 	return result, nil
+}
+
+func (s *OrderService) combineOrdersAndItems(orders []Order, itemsMap map[int][]Item) []OrderWithItems {
+	result := make([]OrderWithItems, len(orders))
+	for i, order := range orders {
+		result[i] = OrderWithItems{
+			Order: order,
+			Items: itemsMap[order.ID],
+		}
+	}
+	return result
 }

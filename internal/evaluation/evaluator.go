@@ -1,70 +1,111 @@
 package evaluation
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"text/template"
 	"time"
 
+	"github.com/agusespa/diffpector/internal/agent"
 	"github.com/agusespa/diffpector/internal/llm"
+	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
+	"github.com/agusespa/diffpector/internal/utils"
+	"github.com/agusespa/diffpector/pkg/config"
 )
 
 type EvaluationConfig = types.EvaluationConfig
 type EvaluationRun = types.EvaluationRun
-type EvaluationResult = types.EvaluationResult
-type PromptVariant = types.PromptVariant
+type TestCaseResult = types.TestCaseResult
 
 type Evaluator struct {
-	suite      *types.EvaluationSuite
-	resultsDir string
-	templates  *template.Template
+	suite          *types.EvaluationSuite
+	envBuilder     *TestEnvironmentBuilder
+	statsCalc      *StatisticsCalculator
+	resultsMgr     *ResultsManager
+	toolRegistry   *tools.Registry
+	parserRegistry *tools.ParserRegistry
 }
 
 func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
-	suite, err := LoadEvaluationSuite(suitePath)
+	suite, err := LoadSuite(suitePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load evaluation suite: %w", err)
 	}
 
-	templates, err := LoadPromptTemplates()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load prompt templates: %w", err)
-	}
+	parserRegistry := tools.NewParserRegistry()
+	toolRegistry := tools.NewRegistry()
+
+	toolRegistry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(".", parserRegistry))
 
 	return &Evaluator{
-		suite:      suite,
-		resultsDir: resultsDir,
-		templates:  templates,
+		suite:          suite,
+		envBuilder:     NewTestEnvironmentBuilder(suite.BaseDir, suite.MockFilesDir),
+		statsCalc:      NewStatisticsCalculator(),
+		resultsMgr:     NewResultsManager(resultsDir),
+		toolRegistry:   toolRegistry,
+		parserRegistry: parserRegistry,
 	}, nil
 }
 
-func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant string) (*EvaluationRun, error) {
+func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant string, numRuns int) (*types.EvaluationResult, error) {
+	if numRuns <= 0 {
+		numRuns = 1
+	}
+
 	provider, err := llm.NewProvider(modelConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
 
+	result := &types.EvaluationResult{
+		Model:          modelConfig.Model,
+		Provider:       string(modelConfig.Type),
+		PromptVariant:  promptVariant,
+		TotalRuns:      numRuns,
+		StartTime:      time.Now(),
+		IndividualRuns: make([]EvaluationRun, 0, numRuns),
+		TestCaseStats:  make(map[string]types.TestCaseStats),
+	}
+
+	PrintRunHeader(modelConfig.Model, promptVariant, numRuns)
+
+	for runNum := 1; runNum <= numRuns; runNum++ {
+		if numRuns > 1 {
+			PrintMultiRunProgress(runNum, numRuns)
+		}
+
+		run, err := e.runSingleEvaluation(modelConfig, promptVariant, provider, runNum)
+		if err != nil {
+			return nil, fmt.Errorf("failed to run evaluation %d: %w", runNum, err)
+		}
+
+		result.IndividualRuns = append(result.IndividualRuns, *run)
+	}
+
+	result.EndTime = time.Now()
+	result.TotalDuration = result.EndTime.Sub(result.StartTime)
+
+	e.statsCalc.CalculateEvaluationStats(result)
+
+	return result, nil
+}
+
+func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVariant string, provider llm.Provider, runNum int) (*EvaluationRun, error) {
 	run := &EvaluationRun{
 		Model:         modelConfig.Model,
 		Provider:      string(modelConfig.Type),
 		PromptVariant: promptVariant,
 		StartTime:     time.Now(),
-		Results:       make([]EvaluationResult, 0, len(e.suite.TestCases)),
+		Results:       make([]TestCaseResult, 0, len(e.suite.TestCases)),
+		RunNumber:     runNum,
 	}
 
-	fmt.Printf("Running evaluation for model: %s, prompt: %s\n", modelConfig.Model, promptVariant)
-
 	for i, testCase := range e.suite.TestCases {
-		fmt.Printf("  [%d/%d] %s... ", i+1, len(e.suite.TestCases), testCase.Name)
+		prefix := fmt.Sprintf("[%d/%d] %s", i+1, len(e.suite.TestCases), testCase.Name)
+		fmt.Print(prefix)
 
 		result, err := e.runSingleTest(testCase, provider, promptVariant)
 		if err != nil {
-			fmt.Printf("ERROR: %v\n", err)
-			result = &EvaluationResult{
+			result = &TestCaseResult{
 				TestCase:      testCase,
 				Model:         modelConfig.Model,
 				PromptHash:    promptVariant,
@@ -74,45 +115,63 @@ func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant 
 				Timestamp:     time.Now(),
 				Issues:        []types.Issue{},
 			}
-		} else {
-			fmt.Printf("DONE (%.2fs, score: %.2f)\n", result.ExecutionTime.Seconds(), result.Score)
 		}
 		run.Results = append(run.Results, *result)
+		PrintTestResult(result, err)
 	}
 
 	run.EndTime = time.Now()
 	run.TotalDuration = run.EndTime.Sub(run.StartTime)
-	CalculateSummary(run)
+	e.statsCalc.CalculateRunSummary(run)
 
 	return run, nil
 }
 
-func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider, promptVariant string) (*EvaluationResult, error) {
+func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider, promptVariant string) (*TestCaseResult, error) {
 	startTime := time.Now()
 
-	env, err := e.createTestEnvironment(testCase)
+	// Load test environment (diff and files)
+	env, err := e.envBuilder.CreateTestEnvironment(testCase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test environment: %w", err)
 	}
 
-	prompt, err := e.buildPrompt(promptVariant, env)
+	// Create agent with the test provider and prompt variant
+	agent := e.createTestAgent(provider, promptVariant)
+	changedFiles := e.envBuilder.extractFilenamesFromDiff(env.Diff)
+
+	// Use the complete agent review process (same as main app) but get the result
+	review, err := agent.ReviewChangesWithResult(env.Diff, env.Files, changedFiles, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build prompt: %w", err)
+		return nil, fmt.Errorf("agent review failed: %w", err)
 	}
 
-	review, err := provider.Generate(prompt)
+	// Use the shared parsing logic
+	issues, err := utils.ParseIssuesFromResponse(review)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate review: %w", err)
-	}
-
-	issues, err := e.parseIssues(review)
-	if err != nil {
+		// Check if this is a format violation (model didn't follow instructions)
+		if utils.IsFormatViolation(err) {
+			// For evaluation purposes, treat format violations as a failure
+			// but still return a result so we can track this metric
+			return &TestCaseResult{
+				TestCase:      testCase,
+				Model:         provider.GetModel(),
+				PromptHash:    promptVariant,
+				Issues:        []types.Issue{}, // Empty since we couldn't parse
+				ExecutionTime: time.Since(startTime),
+				Success:       false, // Mark as failure due to format violation
+				Score:         0.0,   // Zero score for format violations
+				Errors:        []string{fmt.Sprintf("Format violation: %v", err)},
+				Timestamp:     time.Now(),
+			}, nil
+		}
+		// For other parsing errors, return the error
 		return nil, fmt.Errorf("failed to parse issues: %w", err)
 	}
 
-	score := e.calculateScore(testCase.Expected, issues)
+	score := CalculateScore(testCase.Expected, issues)
 
-	return &EvaluationResult{
+	return &TestCaseResult{
 		TestCase:      testCase,
 		Model:         provider.GetModel(),
 		PromptHash:    promptVariant,
@@ -124,199 +183,11 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 	}, nil
 }
 
-func (e *Evaluator) createTestEnvironment(testCase types.TestCase) (*types.TestEnvironment, error) {
-	if testCase.DiffFile == "" {
-		return &types.TestEnvironment{
-			Files: make(map[string]string),
-			Diff:  "",
-		}, nil
-	}
-
-	diffPath := filepath.Join(e.suite.BaseDir, testCase.DiffFile)
-	diffContent, err := os.ReadFile(diffPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read diff file %s: %w", diffPath, err)
-	}
-
-	files, err := e.parseDiffToFiles(string(diffContent))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse diff: %w", err)
-	}
-
-	return &types.TestEnvironment{
-		Files: files,
-		Diff:  string(diffContent),
-	}, nil
+func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error {
+	return e.resultsMgr.SaveEvaluationResults(result)
 }
 
-func (e *Evaluator) parseDiffToFiles(diff string) (map[string]string, error) {
-	filenames := e.extractFilenamesFromDiff(diff)
-
-	files := make(map[string]string)
-	for _, filename := range filenames {
-		content, err := e.loadMockFileContent(filename, diff)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load mock content for %s: %w", filename, err)
-		}
-		files[filename] = content
-	}
-
-	return files, nil
-}
-
-func (e *Evaluator) extractFilenamesFromDiff(diff string) []string {
-	var filenames []string
-	lines := strings.Split(diff, "\n")
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "+++") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				filename := strings.TrimPrefix(parts[1], "b/")
-				if filename != "/dev/null" {
-					filenames = append(filenames, filename)
-				}
-			}
-		}
-	}
-
-	return filenames
-}
-
-func (e *Evaluator) loadMockFileContent(filename, diff string) (string, error) {
-	if e.suite.MockFilesDir == "" {
-		return "", fmt.Errorf("mock files directory not configured")
-	}
-
-	fullPath := filepath.Join(e.suite.MockFilesDir, filename)
-	content, err := os.ReadFile(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read mock file %s: %w", fullPath, err)
-	}
-
-	return string(content), nil
-}
-
-func (e *Evaluator) buildPrompt(variant string, env *types.TestEnvironment) (string, error) {
-	data := struct {
-		Diff           string
-		FileContents   map[string]string
-		SymbolAnalysis string
-	}{
-		Diff:           env.Diff,
-		FileContents:   env.Files,
-		SymbolAnalysis: "",
-	}
-
-	var result strings.Builder
-	err := e.templates.ExecuteTemplate(&result, variant, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", variant, err)
-	}
-
-	return result.String(), nil
-}
-
-func (e *Evaluator) parseIssues(review string) ([]types.Issue, error) {
-	review = strings.TrimSpace(review)
-
-	if review == "APPROVED" {
-		return []types.Issue{}, nil
-	}
-
-	if strings.HasPrefix(review, "```") {
-		lines := strings.Split(review, "\n")
-		if len(lines) > 2 {
-			review = strings.Join(lines[1:len(lines)-1], "\n")
-		}
-	}
-
-	var issues []types.Issue
-	if err := json.Unmarshal([]byte(review), &issues); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
-	}
-
-	return issues, nil
-}
-
-func (e *Evaluator) calculateScore(expected types.ExpectedResults, actual []types.Issue) float64 {
-	scorer := NewSimpleScorer()
-	return scorer.Score(expected, actual)
-}
-
-// SaveResults saves evaluation results to a JSON file
-func (e *Evaluator) SaveResults(run *EvaluationRun) error {
-	if err := os.MkdirAll(e.resultsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create results directory at %s: %w", e.resultsDir, err)
-	}
-
-	filename := fmt.Sprintf("eval_%s_%s_%d.json",
-		run.Model, run.PromptVariant, run.StartTime.Unix())
-	filepath := filepath.Join(e.resultsDir, filename)
-
-	data, err := json.MarshalIndent(run, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal results: %w", err)
-	}
-
-	if err := os.WriteFile(filepath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write results file to %s: %w", filepath, err)
-	}
-
-	fmt.Printf("Results saved to: %s\n", filepath)
-	return nil
-}
-
-func LoadEvaluationSuite(path string) (*types.EvaluationSuite, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read suite file at %s: %w", path, err)
-	}
-
-	var suite types.EvaluationSuite
-	if err := json.Unmarshal(data, &suite); err != nil {
-		return nil, fmt.Errorf("failed to parse suite file %s: %w", path, err)
-	}
-
-	return &suite, nil
-}
-
-func LoadEvaluationConfigs(path string) ([]EvaluationConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file at %s: %w", path, err)
-	}
-
-	var configs []EvaluationConfig
-	if err := json.Unmarshal(data, &configs); err != nil {
-		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
-	}
-
-	return configs, nil
-}
-
-func CalculateSummary(r *types.EvaluationRun) {
-	if len(r.Results) == 0 {
-		return
-	}
-
-	var totalScore float64
-	var successfulTests int
-	for _, result := range r.Results {
-		totalScore += result.Score
-		if result.Success {
-			successfulTests++
-		}
-	}
-
-	r.AverageScore = totalScore / float64(len(r.Results))
-	r.SuccessRate = (float64(successfulTests) / float64(len(r.Results))) * 100
-}
-
-func PrintSummary(r *types.EvaluationRun) {
-	fmt.Printf("\n--- Summary for %s (%s) ---\n", r.Model, r.PromptVariant)
-	fmt.Printf("  Average Score: %.2f\n", r.AverageScore)
-	fmt.Printf("  Success Rate:  %.2f%%\n", r.SuccessRate)
-	fmt.Printf("  Total Duration:  %.2fs\n", r.TotalDuration.Seconds())
-	fmt.Println()
+func (e *Evaluator) createTestAgent(provider llm.Provider, promptVariant string) *agent.CodeReviewAgent {
+	cfg := &config.Config{}
+	return agent.NewCodeReviewAgent(provider, e.toolRegistry, cfg, e.parserRegistry, promptVariant)
 }

@@ -1,3 +1,5 @@
+//go:build ignore
+
 package database
 
 import (
@@ -31,15 +33,15 @@ func NewUserRepository(conn *sql.DB, logger *log.Logger) *UserRepository {
 
 // GetUserByEmail retrieves a user by email address
 func (r *UserRepository) GetUserByEmail(email string) (*User, error) {
-	// This contains a SQL injection vulnerability for testing
-	query := fmt.Sprintf("SELECT id, email, name, created_at, updated_at, is_active, role FROM users WHERE email = '%s'", email)
-	
+	// Safe parameterized query (before state)
+	query := "SELECT id, email, name FROM users WHERE email = ?"
+
 	r.logger.Printf("Executing query: %s", query)
-	
-	row := r.conn.QueryRow(query)
-	
+
+	row := r.conn.QueryRow(query, email)
+
 	var user User
-	err := row.Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt, &user.UpdatedAt, &user.IsActive, &user.Role)
+	err := row.Scan(&user.ID, &user.Email, &user.Name)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -47,16 +49,16 @@ func (r *UserRepository) GetUserByEmail(email string) (*User, error) {
 		r.logger.Printf("Error scanning user: %v", err)
 		return nil, err
 	}
-	
+
 	return &user, nil
 }
 
 // GetUserByID retrieves a user by ID (safer implementation)
 func (r *UserRepository) GetUserByID(userID int) (*User, error) {
 	query := "SELECT id, email, name, created_at, updated_at, is_active, role FROM users WHERE id = ? AND is_active = true"
-	
+
 	row := r.conn.QueryRow(query, userID)
-	
+
 	var user User
 	err := row.Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt, &user.UpdatedAt, &user.IsActive, &user.Role)
 	if err != nil {
@@ -65,7 +67,7 @@ func (r *UserRepository) GetUserByID(userID int) (*User, error) {
 		}
 		return nil, fmt.Errorf("failed to get user by ID: %w", err)
 	}
-	
+
 	return &user, nil
 }
 
@@ -75,18 +77,18 @@ func (r *UserRepository) CreateUser(email, name, role string) (*User, error) {
 		INSERT INTO users (email, name, role, created_at, updated_at, is_active) 
 		VALUES (?, ?, ?, ?, ?, true)
 	`
-	
+
 	now := time.Now()
 	result, err := r.conn.Exec(query, email, name, role, now, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
-	
+
 	id, err := result.LastInsertId()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
-	
+
 	return &User{
 		ID:        int(id),
 		Email:     email,
@@ -101,28 +103,22 @@ func (r *UserRepository) CreateUser(email, name, role string) (*User, error) {
 // UpdateUser updates an existing user
 func (r *UserRepository) UpdateUser(userID int, name, role string) error {
 	query := "UPDATE users SET name = ?, role = ?, updated_at = ? WHERE id = ?"
-	
+
 	_, err := r.conn.Exec(query, name, role, time.Now(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
-	
+
 	return nil
 }
 
 // DeleteUser soft deletes a user (sets is_active to false)
 func (r *UserRepository) DeleteUser(userID string) error {
-	// This also contains a vulnerability - should use parameterized query
-	query := fmt.Sprintf("UPDATE users SET is_active = false, updated_at = '%s' WHERE id = %s", 
-		time.Now().Format("2006-01-02 15:04:05"), userID)
-	
-	_, err := r.conn.Exec(query)
-	if err != nil {
-		r.logger.Printf("Error deleting user: %v", err)
-		return fmt.Errorf("failed to delete user: %w", err)
-	}
-	
-	return nil
+	// Safe parameterized query (before state)
+	query := "DELETE FROM users WHERE id = ?"
+
+	_, err := r.conn.Exec(query, userID)
+	return err
 }
 
 // GetActiveUsers retrieves all active users with pagination
@@ -134,13 +130,13 @@ func (r *UserRepository) GetActiveUsers(limit, offset int) ([]*User, error) {
 		ORDER BY created_at DESC 
 		LIMIT ? OFFSET ?
 	`
-	
+
 	rows, err := r.conn.Query(query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query active users: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var users []*User
 	for rows.Next() {
 		var user User
@@ -151,32 +147,30 @@ func (r *UserRepository) GetActiveUsers(limit, offset int) ([]*User, error) {
 		}
 		users = append(users, &user)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating user rows: %w", err)
 	}
-	
+
 	return users, nil
 }
 
 // GetUsersByRole retrieves users by their role
 func (r *UserRepository) GetUsersByRole(role string) ([]*User, error) {
-	// Potential N+1 query issue if called in a loop
 	query := "SELECT id, email, name, created_at, updated_at, is_active, role FROM users WHERE role = ? AND is_active = true"
-	
+
 	rows, err := r.conn.Query(query, role)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var users []*User
 	for rows.Next() {
 		var user User
 		rows.Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt, &user.UpdatedAt, &user.IsActive, &user.Role)
-		// Missing error handling here - potential bug
 		users = append(users, &user)
 	}
-	
+
 	return users, nil
 }
