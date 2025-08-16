@@ -50,6 +50,12 @@ func NewParserRegistry() *ParserRegistry {
 	}
 	registry.RegisterParser(tsParser)
 
+	javaParser, err := NewJavaParser()
+	if err != nil {
+		panic(fmt.Errorf("failed to create Java parser: %w", err))
+	}
+	registry.RegisterParser(javaParser)
+
 	return registry
 }
 

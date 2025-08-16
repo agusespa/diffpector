@@ -94,13 +94,6 @@ func TestValidateAndDetectLanguage(t *testing.T) {
 			expectError:   true,
 			errorContains: "unsupported language file",
 		},
-		{
-			name:          "unsupported_java_file",
-			files:         []string{"main.go", "script.java"},
-			expectedLang:  "",
-			expectError:   true,
-			errorContains: "unsupported language file",
-		},
 	}
 
 	for _, tt := range tests {
