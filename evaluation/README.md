@@ -27,7 +27,6 @@ The evaluation includes test cases for:
 Available prompt variants:
 
 - **default**: Current production prompt
-- **detailed**: Comprehensive instructions with examples
 
 ## Usage
 
@@ -57,3 +56,8 @@ Each result file contains:
 - Execution times
 - Model and prompt configuration
 - Detailed issue analysis
+
+## Model evaluation history
+- codellama:13b > too many format violation errors
+- codestral > too many format violation errors
+- qwen3:14b > less accuracy and worse performance than qwen2.5-coder:14b
