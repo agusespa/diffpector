@@ -72,5 +72,5 @@ The only api currently supported is `ollama`.
 ```
 
 ### Recommended Models
-- **qwen2.5-coder:14b** - Best overall performance for code review
-- **qwen2.5-coder:7b** - Faster option for quick reviews
+- **qwen2.5-coder:14b** - best balance between accuracy and performance
+- **qwen2.5-coder:7b** - acceptable compromise for quick reviews

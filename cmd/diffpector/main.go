@@ -10,6 +10,7 @@ import (
 	"github.com/agusespa/diffpector/internal/llm"
 	"github.com/agusespa/diffpector/internal/prompts"
 	"github.com/agusespa/diffpector/internal/tools"
+	"github.com/agusespa/diffpector/internal/utils"
 	"github.com/agusespa/diffpector/pkg/config"
 )
 
@@ -43,6 +44,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: Unsupported LLM provider: %v\n", err)
 		os.Exit(1)
 	}
+
+	if err := utils.ValidateModel(cfg.LLM.Model); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	utils.WarnIfUnapproved(cfg.LLM.Model)
 
 	fmt.Println("")
 	fmt.Println("=========================")
