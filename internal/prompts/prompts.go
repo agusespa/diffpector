@@ -14,19 +14,19 @@ var PromptVariants = map[string]types.PromptVariant{
 		Description: "Initial basic prompt",
 		Template:    defaultPromptTemplate,
 	},
+	"comprehensive": {
+		Name:        "comprehensive",
+		Description: "Prompt variant with comprehensive instructions",
+		Template:    comprehensivePromptTemplate,
+	},
 	"optimized": {
 		Name:        "optimized",
-		Description: "Optimized prompt with strong refactor detection",
+		Description: "Prompt variant with improvements for better format output",
 		Template:    optimizedPromptTemplate,
-	},
-	"optimized-v2": {
-		Name:        "optimized-v2",
-		Description: "Simplified optimized prompt with strong refactor detection",
-		Template:    optimizedV2PromptTemplate,
 	},
 }
 
-const DEFAULT_PROMPT = "optimized"
+const DEFAULT_PROMPT = "default"
 
 func GetPromptVariant(name string) (types.PromptVariant, error) {
 	variant, exists := PromptVariants[name]
@@ -72,30 +72,40 @@ func BuildPromptWithTemplate(variantName string, data any) (string, error) {
 	return result.String(), nil
 }
 
-const defaultPromptTemplate = `You are a code reviewer. Your task is to review ONLY the code changes shown in the diff below.
+const defaultPromptTemplate = `You are an expert code reviewer analyzing code changes for real issues.
 
 === CODE CHANGES TO REVIEW ===
 {{.Diff}}
 
-=== REFERENCE MATERIALS (DO NOT REVIEW) ===
-The following sections provide context to help you understand the changes above.
-DO NOT report any issues in the reference materials - they are for context only.
-
-{{if .SymbolAnalysis}}--- Symbol Usage Context ---
+{{if .SymbolAnalysis}}=== REFERENCE CONTEXT (DO NOT REVIEW) ===
 {{.SymbolAnalysis}}
+{{end}}
 
-{{end}}=== END OF REFERENCE MATERIALS ===
+=== ANALYSIS INSTRUCTIONS ===
 
-CRITICAL REVIEW INSTRUCTIONS:
-1. REVIEW ONLY THE "CODE CHANGES TO REVIEW" SECTION ABOVE
-2. Look for lines that start with + or - in the diff - these are the ONLY lines you should analyze
-3. The "REFERENCE MATERIALS" section is provided to help you understand context - DO NOT report issues in reference materials
-4. If you see potential issues in the reference materials, IGNORE them unless they appear in the actual diff changes
-5. Focus on REAL issues, not stylistic preferences or functionally equivalent refactoring
-6. Clean refactoring that maintains the same behavior should not be flagged as issues
+STEP 1 - IDENTIFY ACTUAL CHANGES:
+- Look ONLY at lines starting with + (additions) or - (deletions) in the diff
+- Ignore any reference context - it's for understanding only
 
-RESPONSE FORMAT - CRITICAL:
-You MUST respond in one of these two formats ONLY:
+STEP 2 - CLEAN REFACTORING CHECK:
+Ask: "Does this change produce the SAME OUTPUT for the SAME INPUT?"
+If YES → This is clean refactoring → RESPOND WITH "APPROVED"
+
+STEP 3 - DETECT REAL ISSUES:
+CRITICAL:
+- Security vulnerabilities (SQL injection, exposed credentials, authentication bypass)
+- Memory safety issues (buffer overflows, resource leaks)
+- Logic errors causing crashes or data corruption
+- Concurrency issues (race conditions, removed synchronization)
+WARNING:
+- Performance problems (N+1 queries, inefficient algorithms)
+- Missing error handling for operations that can fail
+- Resource management issues (unclosed connections, files)
+- Breaking API changes
+MINOR:
+- Significant readability problems
+
+=== RESPONSE FORMAT ===
 
 FORMAT 1 - No issues found:
 APPROVED
@@ -104,146 +114,165 @@ FORMAT 2 - Issues found:
 [
   {
     "severity": "CRITICAL",
-    "file_path": "path/to/file.go",
-    "start_line": 10,
-    "end_line": 12,
-    "description": "Clear description of the issue"
+    "file_path": "internal/database/user.go",
+    "start_line": 18,
+    "end_line": 19,
+    "description": "Replaced parameterized SQL query with fmt.Sprintf(), creating SQL injection vulnerability"
   }
 ]
 
-IMPORTANT RULES:
-- DO NOT include any explanatory text, reasoning, or commentary
-- DO NOT wrap JSON in code blocks or markdown formatting
-- DO NOT say "Here are my findings" or similar phrases
-- DO NOT explain your reasoning - just provide the result
-- The "severity" must be exactly one of: "CRITICAL", "WARNING", "MINOR"
-- If you find no issues, respond with exactly "APPROVED" and nothing else
-- If you find issues, respond with only the raw JSON array and nothing else
+CRITICAL RULES:
+- Use EXACT file path from diff header (e.g., "internal/database/user.go")
+- Line numbers must correspond to the changed lines in the diff
+- Severity must be: "CRITICAL", "WARNING", or "MINOR"  
+- No explanatory text, reasoning, or markdown formatting
+- Respond with raw JSON array or "APPROVED" only`
 
-Focus on:
-- Security vulnerabilities and potential risks
-- Performance issues and optimization opportunities  
-- Code maintainability and readability
-- Potential bugs and error handling
-- Breaking changes that might affect symbol usages shown in the analysis`
-
-const optimizedPromptTemplate = `You are an expert code reviewer analyzing code changes for real issues.
+const comprehensivePromptTemplate = `You are a Principal Software Engineer, an expert in code reviewing, analyzing code changes for real issues and providing constructive feedback.
 
 === CODE CHANGES TO REVIEW ===
 {{.Diff}}
 
 {{if .SymbolAnalysis}}=== REFERENCE CONTEXT (DO NOT REVIEW) ===
 {{.SymbolAnalysis}}
+{{end}}
 
-{{end}}=== CLEAN REFACTORING CHECK ===
-BEFORE flagging issues, ask: "Does this change produce the SAME OUTPUT for the SAME INPUT?"
+=== ANALYSIS INSTRUCTIONS ===
+
+STEP 1 - IDENTIFY ACTUAL CHANGES:
+- Look ONLY at lines starting with + (additions) or - (deletions) in the diff
+- Ignore any reference context - it's for understanding only
+
+STEP 2 - CLEAN REFACTORING CHECK:
+Ask: "Does this change produce the SAME OUTPUT for the SAME INPUT?"
 If YES → This is clean refactoring → RESPOND WITH "APPROVED"
 
-Examples of clean refactoring (ALWAYS APPROVE):
-- temp = f(x); return g(temp) → return g(f(x))
-- if x == "" { return true } return false → return x == ""
-- Eliminating intermediate variables when result is identical
-- Comment improvements without changing code behavior
-
-=== REAL ISSUES TO DETECT ===
-
+STEP 3 - DETECT REAL ISSUES & PROVIDE ACTIONABLE FEEDBACK:
 CRITICAL:
-- Security vulnerabilities (SQL injection, exposed credentials)
+- Security vulnerabilities (SQL injection, exposed credentials, authentication bypass)
 - Memory safety issues (buffer overflows, resource leaks)
 - Logic errors causing crashes or data corruption
-- Removed error handling for operations that can fail
-- Concurrency issues (removed synchronization, race conditions)
-
+- Concurrency issues (race conditions, removed synchronization)
 WARNING:
-- Performance problems (N+1 queries, batch → individual calls in loops)
-- Missing error handling for common failure cases
+- Performance problems (N+1 queries, inefficient algorithms)
+- Missing error handling for operations that can fail
 - Resource management issues (unclosed connections, files)
 - Breaking API changes
-
 MINOR:
-- Significant readability problems (very poor naming)
-
-IGNORE:
-- Style changes that don't affect functionality
-- Code simplification maintaining same behavior
-- Functionally equivalent patterns
-- Minor optimizations or preferences
+- Significant readability problems
 
 === RESPONSE FORMAT ===
 
-FORMAT 1 - No issues:
+FORMAT 1 - No issues found:
 APPROVED
 
 FORMAT 2 - Issues found:
 [
   {
     "severity": "CRITICAL",
-    "file_path": "path/to/file.go",
-    "start_line": 10,
-    "end_line": 12,
-    "description": "Removed SQL parameter binding, creating SQL injection vulnerability"
+    "file_path": "internal/database/user.go",
+    "start_line": 18,
+    "end_line": 19,
+    "description": "Replaced parameterized SQL query with fmt.Sprintf(), creating SQL injection vulnerability"
   }
 ]
 
-RULES:
+CRITICAL RULES:
+- Use EXACT file path from diff header (e.g., "internal/database/user.go")
+- Line numbers must correspond to the changed lines in the diff
 - Severity must be: "CRITICAL", "WARNING", or "MINOR"
-- No explanatory text or commentary
-- No markdown formatting
-- If same input produces same output, it's refactoring - APPROVE it`
+- Provide a clear and actionable suggestion for each issue.
+- No explanatory text, reasoning, or markdown formatting
+- Respond with raw JSON array or "APPROVED" only`
 
-const optimizedV2PromptTemplate = `You are an expert code reviewer analyzing code changes for real issues.
+const optimizedPromptTemplate = `You are a Principal Software Engineer performing code review. Your task is to identify real issues in code changes and return results in the exact specified format.
 
 === CODE CHANGES TO REVIEW ===
 {{.Diff}}
 
-{{if .SymbolAnalysis}}
-=== REFERENCE CONTEXT (DO NOT REVIEW) ===
+{{if .SymbolAnalysis}}=== REFERENCE CONTEXT (FOR UNDERSTANDING ONLY - DO NOT REVIEW) ===
 {{.SymbolAnalysis}}
 {{end}}
 
-=== ISSUES TO DETECT ===
+=== ANALYSIS PROCESS ===
 
-CLEAN REFACTORING CHECK: BEFORE flagging issues, ask "Does this change produce the SAME OUTPUT for the SAME INPUT?" If YES → This is clean refactoring → RESPOND WITH "APPROVED"
+STEP 1: IDENTIFY ACTUAL CHANGES
+- Examine ONLY lines starting with + (additions) or - (deletions)
+- Ignore unchanged lines and reference context
+- Focus on what code is being added, removed, or modified
 
-CRITICAL:
-- Security vulnerabilities (SQL injection, exposed credentials)
-- Memory safety issues (buffer overflows, resource leaks)
+STEP 2: EVALUATE FOR ISSUES
+Scan for these issue types in order of priority:
+
+🔴 CRITICAL (Security, crashes, data loss):
+- SQL injection vulnerabilities (unparameterized queries)
+- Authentication/authorization bypass
+- Exposed credentials, API keys, or secrets
+- Buffer overflows or memory corruption
 - Logic errors causing crashes or data corruption
-- Lacking error handling for operations that can fail
-- Concurrency issues (lacking synchronization, race conditions)
+- Removed error handling for critical operations
 
-WARNING:
-- Performance problems (N+1 queries, batch → individual calls in loops)
-- Missing error handling for common failure cases
-- Resource management issues (unclosed connections, files)
-- Breaking API changes
+🟡 WARNING (Performance, reliability):
+- Performance degradation (N+1 queries, inefficient algorithms)
+- Missing error handling for operations that can fail
+- Resource leaks (unclosed connections, files, database handles)
+- Concurrency issues (race conditions, missing synchronization)
+- Breaking changes to public APIs
 
-MINOR:
-- Significant readability problems (very poor naming)
-
-IGNORE:
-- Style changes that don't affect functionality
-- Code simplification maintaining same behavior
-- Functionally equivalent patterns
-- Minor optimizations or preferences
+🔵 MINOR (Code quality):
+- Significant readability problems that impact maintainability
+- Missing input validation for user-facing functions
+- Inconsistent error handling patterns
 
 === RESPONSE FORMAT ===
 
-FORMAT 1 - No issues:
+If NO issues found:
 APPROVED
 
-FORMAT 2 - Issues found: must be valid json (array of objects):
+If issues found:
 [
   {
     "severity": "CRITICAL",
-    "file_path": "path/to/file.go",
-    "start_line": 10,
-    "end_line": 12,
-    "description": "Removed SQL parameter binding, creating SQL injection vulnerability"
+    "file_path": "exact/path/from/diff/header.go",
+    "start_line": 25,
+    "end_line": 27,
+    "description": "Specific issue description with actionable fix suggestion"
   }
 ]
 
-RULES:
-- Severity must be: "CRITICAL", "WARNING", or "MINOR"
-- No explanatory text or commentary
-- No markdown formatting`
+=== RESPONSE EXAMPLES ===
+
+Example 1 - No issues:
+APPROVED
+
+Example 2 - Single issue:
+[{"severity":"WARNING","file_path":"internal/auth/handler.go","start_line":42,"end_line":42,"description":"Missing error handling for database query - add proper error checking and return appropriate HTTP status"}]
+
+Example 3 - Multiple issues:
+[
+  {
+    "severity": "CRITICAL",
+    "file_path": "pkg/database/user.go", 
+    "start_line": 18,
+    "end_line": 20,
+    "description": "SQL injection vulnerability - replace fmt.Sprintf with parameterized query using database/sql placeholders"
+  },
+  {
+    "severity": "WARNING",
+    "file_path": "pkg/database/user.go",
+    "start_line": 35,
+    "end_line": 35, 
+    "description": "Missing error handling for database connection - add proper error checking and connection cleanup"
+  }
+]
+
+=== CRITICAL FORMATTING RULES ===
+✅ MUST: Use exact file path from diff header (e.g., "a/internal/service.go" → "internal/service.go")
+✅ MUST: Line numbers must match the actual changed lines in the diff
+✅ MUST: Severity must be exactly "CRITICAL", "WARNING", or "MINOR" 
+✅ MUST: Description must be actionable and specific
+✅ MUST: Return valid JSON array or exactly "APPROVED"
+✅ MUST: No additional text, explanations, markdown, or code blocks
+❌ NEVER: Include reasoning, explanations, or commentary
+❌ NEVER: Use markdown formatting in the response
+❌ NEVER: Add text before or after the JSON/APPROVED response`
