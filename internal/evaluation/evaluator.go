@@ -101,7 +101,7 @@ func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVa
 
 	for i, testCase := range e.suite.TestCases {
 		prefix := fmt.Sprintf("[%d/%d] %s", i+1, len(e.suite.TestCases), testCase.Name)
-		fmt.Print(prefix)
+		fmt.Println(prefix)
 
 		result, err := e.runSingleTest(testCase, provider, promptVariant)
 		if err != nil {

@@ -35,9 +35,9 @@ func PrintEvaluationSummary(r *types.EvaluationResult) {
 
 func PrintTestResult(result *types.TestCaseResult, err error) {
 	if err != nil {
-		fmt.Printf("ERROR: %v\n", err)
+		fmt.Printf("  ERROR: %v\n", err)
 	} else {
-		fmt.Printf("DONE (%.2fs, score: %.2f)\n", result.ExecutionTime.Seconds(), result.Score)
+		fmt.Printf("  DONE (%.2fs, score: %.2f)\n", result.ExecutionTime.Seconds(), result.Score)
 	}
 }
 
