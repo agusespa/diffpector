@@ -1,76 +1,40 @@
-//go:build ignore
-
 package analytics
 
 import (
-	"fmt"
+	"encoding/json"
 	"time"
 )
 
-type User struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+type EventProcessor struct {
+	events []Event
 }
 
-type Activity struct {
-	ID     int       `json:"id"`
-	UserID int       `json:"user_id"`
-	Action string    `json:"action"`
-	Time   time.Time `json:"time"`
+type Event struct {
+	ID        string    `json:"id"`
+	UserID    int       `json:"user_id"`
+	EventType string    `json:"event_type"`
+	Timestamp time.Time `json:"timestamp"`
+	Data      string    `json:"data"`
 }
 
-type UserReport struct {
-	User       *User       `json:"user"`
-	Activities []*Activity `json:"activities"`
-	Generated  time.Time   `json:"generated"`
-}
-
-type UserService interface {
-	GetUsersBatch(userIDs []int) ([]*User, error)
-	GetUser(userID int) (*User, error)
-}
-
-type ActivityService interface {
-	GetActivitiesBatch(userIDs []int) (map[int][]*Activity, error)
-	GetUserActivities(userID int) ([]*Activity, error)
-}
-
-type Processor struct {
-	userService     UserService
-	activityService ActivityService
-}
-
-func NewProcessor(userService UserService, activityService ActivityService) *Processor {
-	return &Processor{
-		userService:     userService,
-		activityService: activityService,
+func (p *EventProcessor) ProcessEvents(rawEvents []string) error {
+	for _, rawEvent := range rawEvents {
+		var event Event
+		err := json.Unmarshal([]byte(rawEvent), &event)
+		if err != nil {
+			return err
+		}
+		p.events = append(p.events, event)
 	}
+	return nil
 }
 
-// GenerateUserReports processes user reports
-func (p *Processor) GenerateUserReports(userIDs []int) ([]*UserReport, error) {
-	if len(userIDs) == 0 {
-		return nil, fmt.Errorf("no users provided")
-	}
-
-	users, err := p.userService.GetUsersBatch(userIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	activities, err := p.activityService.GetActivitiesBatch(userIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	reports := make([]*UserReport, len(users))
-	for i, user := range users {
-		reports[i] = &UserReport{
-			User:       user,
-			Activities: activities[user.ID],
-			Generated:  time.Now(),
+func (p *EventProcessor) GetEventsByUser(userID int) []Event {
+	var userEvents []Event
+	for _, event := range p.events {
+		if event.UserID == userID {
+			userEvents = append(userEvents, event)
 		}
 	}
-
-	return reports, nil
+	return userEvents
 }

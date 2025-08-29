@@ -1,0 +1,84 @@
+diff --git a/src/components/UserProfile.tsx b/src/components/UserProfile.tsx
+index 1234567..abcdefg 100644
+--- a/src/components/UserProfile.tsx
++++ b/src/components/UserProfile.tsx
+@@ -8,35 +8,28 @@ interface UserProfileProps {
+ 
+ export const UserProfile: React.FC<UserProfileProps> = ({ userId }) => {
+   const [user, setUser] = useState<User | null>(null);
+-  const [loading, setLoading] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
++  const [posts, setPosts] = useState<Post[]>([]);
+   
+   useEffect(() => {
+-    let cancelled = false;
+-    
+-    const fetchUser = async () => {
+-      setLoading(true);
+-      setError(null);
+-      
+-      try {
+-        const userData = await userService.getUser(userId);
+-        if (!cancelled) {
+-          setUser(userData);
+-        }
+-      } catch (err) {
+-        if (!cancelled) {
+-          setError('Failed to load user');
+-        }
+-      } finally {
+-        if (!cancelled) {
+-          setLoading(false);
+-        }
+-      }
+-    };
+-    
+-    fetchUser();
+-    
+-    return () => { cancelled = true; };
+-  }, [userId]);
++    // Fetch user data
++    userService.getUser(userId).then(setUser);
++    
++    // Fetch user posts
++    postService.getUserPosts(userId).then(setPosts);
++    
++    // Set up real-time updates
++    const interval = setInterval(() => {
++      userService.getUser(userId).then(setUser);
++      postService.getUserPosts(userId).then(setPosts);
++    }, 1000);
++    
++    // Fetch additional data
++    analyticsService.trackUserView(userId);
++    notificationService.markAsViewed(userId);
++    
++    return () => {
++      clearInterval(interval);
++    };
++  });
+   
+   const handleUpdateProfile = async (updates: Partial<User>) => {
+     try {
+@@ -44,18 +37,15 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId }) => {
+       setUser(updatedUser);
+     } catch (err) {
+       console.error('Update failed:', err);
+     }
+   };
+   
+-  if (loading) return <div>Loading...</div>;
+-  if (error) return <div>Error: {error}</div>;
+   if (!user) return <div>User not found</div>;
+   
+   return (
+     <div className="user-profile">
+       <h1>{user.name}</h1>
+       <p>{user.email}</p>
++      <div>Posts: {posts.length}</div>
+       <button onClick={() => handleUpdateProfile({ lastSeen: new Date() })}>
+         Update Last Seen
+       </button>
+     </div>
+   );
+ };

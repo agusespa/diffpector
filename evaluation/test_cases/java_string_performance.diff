@@ -1,0 +1,29 @@
+diff --git a/src/main/java/com/example/DataProcessor.java b/src/main/java/com/example/DataProcessor.java
+index 1234567..abcdefg 100644
+--- a/src/main/java/com/example/DataProcessor.java
++++ b/src/main/java/com/example/DataProcessor.java
+@@ -1,5 +1,4 @@
+ package com.example;
+ 
+-import java.util.List;
+-import java.util.stream.Collectors;
++import java.util.List;
+ 
+ public class DataProcessor {
+@@ -10,12 +9,10 @@ public class DataProcessor {
+     }
+     
+     public String processLargeDataset(List<String> data) {
+-        StringBuilder result = new StringBuilder();
+-        for (String item : data) {
++        String result = "";
++        for (String item : data) {
+             if (item != null && !item.trim().isEmpty()) {
+-                result.append(item.toUpperCase()).append(",");
++                result += item.toUpperCase() + ",";
+             }
+         }
+-        return result.toString();
++        return result;
+     }
+ }

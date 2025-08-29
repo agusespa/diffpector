@@ -1,73 +1,55 @@
-//go:build ignore
-
 package service
 
-type Order struct {
-	ID     int     `json:"id"`
-	UserID int     `json:"user_id"`
-	Total  float64 `json:"total"`
-	Status string  `json:"status"`
-}
+import (
+	"database/sql"
+)
 
-type Item struct {
-	ID       int     `json:"id"`
-	OrderID  int     `json:"order_id"`
-	Name     string  `json:"name"`
-	Price    float64 `json:"price"`
-	Quantity int     `json:"quantity"`
+type OrderService struct {
+	db *sql.DB
 }
 
 type OrderWithItems struct {
-	Order Order  `json:"order"`
-	Items []Item `json:"items"`
+	OrderID int
+	Items   []OrderItem
 }
 
-type Database interface {
-	GetOrdersByUserID(userID int) ([]Order, error)
-	GetOrderItems(orderID int) ([]Item, error)
-	GetAllOrderItems(orders []Order) (map[int][]Item, error)
-	Query(query string, args ...any) ([]Item, error)
+type OrderItem struct {
+	ID       int
+	Name     string
+	Quantity int
 }
 
-type OrderService struct {
-	db Database
-}
-
-func NewOrderService(db Database) *OrderService {
-	return &OrderService{db: db}
-}
-
-// GetOrdersWithItems loads orders with their associated items
 func (s *OrderService) GetOrdersWithItems(userID int) ([]OrderWithItems, error) {
-	orders, err := s.db.GetOrdersByUserID(userID)
+	orders, err := s.GetAllOrdersByUser(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Batch loading of all items
-	allItems, err := s.db.GetAllOrderItems(orders)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]OrderWithItems, len(orders))
-	for i, order := range orders {
-		result[i] = OrderWithItems{
-			Order: order,
-			Items: allItems[order.ID],
+	var result []OrderWithItems
+	for _, order := range orders {
+		items, err := s.GetAllOrderItems(order.ID)
+		if err != nil {
+			return nil, err
 		}
+		result = append(result, OrderWithItems{
+			OrderID: order.ID,
+			Items:   items,
+		})
 	}
-
 	return result, nil
 }
 
-func (s *OrderService) combineOrdersAndItems(orders []Order, itemsMap map[int][]Item) []OrderWithItems {
-	result := make([]OrderWithItems, len(orders))
-	for i, order := range orders {
-		result[i] = OrderWithItems{
-			Order: order,
-			Items: itemsMap[order.ID],
-		}
-	}
-	return result
+func (s *OrderService) GetAllOrdersByUser(userID int) ([]Order, error) {
+	// Implementation
+	return nil, nil
+}
+
+func (s *OrderService) GetAllOrderItems(orderID int) ([]OrderItem, error) {
+	// Implementation
+	return nil, nil
+}
+
+type Order struct {
+	ID     int
+	UserID int
 }

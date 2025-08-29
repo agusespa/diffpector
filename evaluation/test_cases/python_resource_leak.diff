@@ -1,0 +1,43 @@
+diff --git a/src/io/file_manager.py b/src/io/file_manager.py
+index 1234567..abcdefg 100644
+--- a/src/io/file_manager.py
++++ b/src/io/file_manager.py
+@@ -1,25 +1,20 @@
+ import os
+-import sqlite3
+-from contextlib import contextmanager
++import sqlite3
+ 
+ class FileManager:
+-    @contextmanager
+-    def get_db_connection(self, db_path: str):
+-        conn = sqlite3.connect(db_path)
+-        try:
+-            yield conn
+-        finally:
+-            conn.close()
++    def get_db_connection(self, db_path: str):
++        return sqlite3.connect(db_path)
+     
+     def read_file_content(self, file_path: str) -> str:
+-        with open(file_path, 'r') as f:
+-            return f.read()
++        f = open(file_path, 'r')
++        content = f.read()
++        return content
+     
+     def save_to_database(self, data: dict, db_path: str) -> None:
+-        with self.get_db_connection(db_path) as conn:
+-            cursor = conn.cursor()
+-            cursor.execute(
+-                "INSERT INTO data (content) VALUES (?)",
+-                (str(data),)
+-            )
+-            conn.commit()
++        conn = self.get_db_connection(db_path)
++        cursor = conn.cursor()
++        cursor.execute(
++            "INSERT INTO data (content) VALUES (?)",
++            (str(data),)
++        )
++        conn.commit()

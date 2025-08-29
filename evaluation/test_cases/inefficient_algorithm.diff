@@ -1,0 +1,29 @@
+diff --git a/internal/analytics/matcher.go b/internal/analytics/matcher.go
+index 1234567..abcdefg 100644
+--- a/internal/analytics/matcher.go
++++ b/internal/analytics/matcher.go
+@@ -15,12 +15,15 @@ type ActivityMatcher struct {
+ func (m *ActivityMatcher) MatchUsersToActivities(users []*User, activities []*Activity) map[int][]*Activity {
+ 	result := make(map[int][]*Activity)
+ 	
+-	// Create lookup map for efficient matching
+-	activityMap := make(map[int][]*Activity)
+-	for _, activity := range activities {
+-		activityMap[activity.UserID] = append(activityMap[activity.UserID], activity)
+-	}
+-	
+-	for _, user := range users {
+-		result[user.ID] = activityMap[user.ID]
++	// Match activities to users
++	for _, user := range users {
++		var userActivities []*Activity
++		for _, activity := range activities {
++			if activity.UserID == user.ID {
++				userActivities = append(userActivities, activity)
++			}
++		}
++		result[user.ID] = userActivities
+ 	}
+ 	
+ 	return result
+ }

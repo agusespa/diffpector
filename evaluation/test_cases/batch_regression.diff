@@ -1,0 +1,22 @@
+diff --git a/internal/service/user.go b/internal/service/user.go
+index 1234567..abcdefg 100644
+--- a/internal/service/user.go
++++ b/internal/service/user.go
+@@ -20,8 +20,12 @@ type UserService struct {
+ func (s *UserService) GetUsersWithProfiles(userIDs []int) ([]*UserWithProfile, error) {
+ 	if len(userIDs) == 0 {
+ 		return nil, nil
+ 	}
+ 	
+-	return s.repository.GetUsersWithProfilesBatch(userIDs)
++	var result []*UserWithProfile
++	for _, userID := range userIDs {
++		userWithProfile, err := s.repository.GetUserWithProfile(userID)
++		if err != nil {
++			return nil, err
++		}
++		result = append(result, userWithProfile)
++	}
++	
++	return result, nil
+ }

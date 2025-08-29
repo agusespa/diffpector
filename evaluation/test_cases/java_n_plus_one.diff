@@ -1,0 +1,22 @@
+diff --git a/src/main/java/com/example/UserService.java b/src/main/java/com/example/UserService.java
+index 1234567..abcdefg 100644
+--- a/src/main/java/com/example/UserService.java
++++ b/src/main/java/com/example/UserService.java
+@@ -15,8 +15,12 @@ public class UserService {
+     }
+     
+     public List<UserReport> generateUserReports(List<String> userIds) {
+-        List<User> users = userRepository.findUsersByIds(userIds);
+-        return users.stream()
+-            .map(this::createReport)
+-            .collect(Collectors.toList());
++        List<UserReport> reports = new ArrayList<>();
++        for (String userId : userIds) {
++            User user = userRepository.findById(userId);
++            if (user != null) {
++                reports.add(createReport(user));
++            }
++        }
++        return reports;
+     }
+ }

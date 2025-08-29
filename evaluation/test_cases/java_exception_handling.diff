@@ -1,0 +1,85 @@
+diff --git a/src/main/java/com/example/PaymentProcessor.java b/src/main/java/com/example/PaymentProcessor.java
+index 1234567..abcdefg 100644
+--- a/src/main/java/com/example/PaymentProcessor.java
++++ b/src/main/java/com/example/PaymentProcessor.java
+@@ -1,50 +1,35 @@
+ package com.example;
+ 
+-import java.math.BigDecimal;
+-import java.util.logging.Logger;
++import java.math.BigDecimal;
+ 
+ public class PaymentProcessor {
+-    private static final Logger logger = Logger.getLogger(PaymentProcessor.class.getName());
+     private PaymentGateway gateway;
+     
+     public PaymentResult processPayment(String cardNumber, BigDecimal amount) {
+-        try {
+-            validateCardNumber(cardNumber);
+-            validateAmount(amount);
+-            
+-            PaymentRequest request = new PaymentRequest(cardNumber, amount);
+-            return gateway.processPayment(request);
+-            
+-        } catch (InvalidCardException e) {
+-            logger.warning("Invalid card number provided: " + e.getMessage());
+-            return PaymentResult.failure("Invalid card number");
+-        } catch (InvalidAmountException e) {
+-            logger.warning("Invalid amount provided: " + e.getMessage());
+-            return PaymentResult.failure("Invalid amount");
+-        } catch (PaymentGatewayException e) {
+-            logger.severe("Payment gateway error: " + e.getMessage());
+-            return PaymentResult.failure("Payment processing failed");
+-        } catch (Exception e) {
+-            logger.severe("Unexpected error during payment processing: " + e.getMessage());
+-            return PaymentResult.failure("System error");
+-        }
++        // No input validation
++        PaymentRequest request = new PaymentRequest(cardNumber, amount);
++        return gateway.processPayment(request); // Uncaught exceptions
+     }
+     
+     public void refundPayment(String transactionId, BigDecimal amount) {
+-        try {
+-            if (transactionId == null || transactionId.trim().isEmpty()) {
+-                throw new IllegalArgumentException("Transaction ID cannot be null or empty");
+-            }
+-            
+-            RefundRequest request = new RefundRequest(transactionId, amount);
+-            gateway.processRefund(request);
+-            
+-        } catch (RefundException e) {
+-            logger.severe("Refund failed for transaction " + transactionId + ": " + e.getMessage());
+-            throw new RuntimeException("Refund processing failed", e);
+-        } catch (Exception e) {
+-            logger.severe("Unexpected error during refund: " + e.getMessage());
+-            throw new RuntimeException("System error during refund", e);
+-        }
++        // No null checks or exception handling
++        RefundRequest request = new RefundRequest(transactionId, amount);
++        gateway.processRefund(request);
+     }
+     
+     public PaymentStatus getPaymentStatus(String transactionId) {
+-        try {
+-            return gateway.getPaymentStatus(transactionId);
+-        } catch (Exception e) {
+-            logger.warning("Failed to get payment status for " + transactionId + ": " + e.getMessage());
+-            return PaymentStatus.UNKNOWN;
+-        }
++        // No exception handling - will propagate all exceptions
++        return gateway.getPaymentStatus(transactionId);
++    }
++    
++    public void batchProcessPayments(PaymentRequest[] requests) {
++        // No error handling - one failure stops entire batch
++        for (PaymentRequest request : requests) {
++            gateway.processPayment(request);
++        }
++    }
++    
++    public BigDecimal calculateFee(BigDecimal amount) {
++        // Potential division by zero, no validation
++        return amount.divide(new BigDecimal("100")).multiply(new BigDecimal("2.5"));
+     }
+ }

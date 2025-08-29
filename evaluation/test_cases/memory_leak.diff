@@ -2,7 +2,15 @@ diff --git a/internal/cache/manager.go b/internal/cache/manager.go
 index 1234567..abcdefg 100644
 --- a/internal/cache/manager.go
 +++ b/internal/cache/manager.go
-@@ -20,15 +20,22 @@ func (m *CacheManager) ProcessLargeDataset(data []byte) error {
+@@ -8,6 +8,7 @@ import (
+ 
+ type CacheManager struct {
+ 	globalCache map[string][]byte
++	connections []*sql.DB
+ }
+ 
+ func (m *CacheManager) ProcessLargeDataset(data []byte) error {
+@@ -20,15 +21,35 @@ func (m *CacheManager) ProcessLargeDataset(data []byte) error {
  		return fmt.Errorf("failed to connect to database: %w", err)
  	}
  	
@@ -11,8 +19,13 @@ index 1234567..abcdefg 100644
 -			log.Printf("Failed to close database connection: %v", err)
 -		}
 -	}()
-+	// Initialize cache for this processing session
-+	m.globalCache = make(map[string][]byte)
++	// Store connection for later use (never cleaned up)
++	m.connections = append(m.connections, conn)
++	
++	// Initialize cache for this processing session (never cleared)
++	if m.globalCache == nil {
++		m.globalCache = make(map[string][]byte)
++	}
  	
  	// Process data in chunks
  	for i := 0; i < len(data); i += chunkSize {
@@ -23,19 +36,29 @@ index 1234567..abcdefg 100644
  		
 -		chunk := make([]byte, end-i)
 -		copy(chunk, data[i:end])
-+		// Use larger buffer to reduce allocations
-+		tempBuffer := make([]byte, chunkSize*10)
++		// Allocate large buffers that accumulate over time
++		tempBuffer := make([]byte, chunkSize*10) // Much larger than needed
 +		copy(tempBuffer, data[i:end])
  		
 -		if err := m.processChunk(conn, chunk); err != nil {
-+		// Cache the processed chunk for potential reuse
-+		cacheKey := fmt.Sprintf("chunk_%d", i)
++		// Cache every chunk permanently (grows indefinitely)
++		cacheKey := fmt.Sprintf("chunk_%d_%d", time.Now().UnixNano(), i)
 +		m.globalCache[cacheKey] = tempBuffer
++		
++		// Create goroutines that capture large data (goroutine leak)
++		go func(buffer []byte, key string) {
++			// This goroutine never exits and holds references to buffer
++			for {
++				time.Sleep(time.Hour)
++				log.Printf("Processing %s with %d bytes", key, len(buffer))
++			}
++		}(tempBuffer, cacheKey)
 +		
 +		if err := m.processChunk(conn, tempBuffer); err != nil {
  			return err
  		}
  	}
  	
++	// Connection is never closed, causing connection leak
  	return nil
  }

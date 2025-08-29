@@ -1,29 +1,28 @@
-//go:build ignore
-
 package helper
 
 import (
 	"fmt"
+	"strings"
 )
 
-// formatUserName formats a user's name for display
-func formatUserName(firstName, lastName string) string {
-	if firstName == "" && lastName == "" {
-		return "Anonymous"
+func FormatUserData(name, email string, age int) string {
+	if name == "" {
+		name = "Unknown"
 	}
-
-	if firstName == "" {
-		return lastName
+	if email == "" {
+		email = "no-email@example.com"
 	}
-
-	if lastName == "" {
-		return firstName
-	}
-
-	return fmt.Sprintf("%s %s", firstName, lastName)
+	
+	return fmt.Sprintf("%s <%s> (age: %d)", name, email, age)
 }
 
-// Helper function with unclear name
-func process(data interface{}) interface{} {
-	return data
+func ProcessNames(names []string) []string {
+	var result []string
+	for _, name := range names {
+		processed := strings.TrimSpace(name)
+		if processed != "" {
+			result = append(result, processed)
+		}
+	}
+	return result
 }
