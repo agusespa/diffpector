@@ -3,7 +3,7 @@ EVAL_RESULTS_DIR := evaluation/results
 EVAL_CONFIG_FILE := evaluation/model_configs.json
 EVAL_SUITE_FILE := evaluation/test_suite.json
 
-.PHONY: eval-help eval-compare-models eval-compare-prompts eval-list-prompts eval-prompts eval-models eval-comprehensive eval-clean
+.PHONY: eval-help eval-compare-models eval-compare-prompts eval-list-prompts eval-prompts eval-models eval-models-sm eval-comprehensive eval-clean
 
 eval-help:
 	@echo "=============================="
@@ -47,11 +47,15 @@ eval-models:
 	@echo "Running model evaluation..."
 	@go run $(EVAL_GO_FILE) --variant model-comparison --config $(EVAL_CONFIG_FILE) --suite $(EVAL_SUITE_FILE) --results $(EVAL_RESULTS_DIR)
 
+eval-models-sm:
+	@echo "Running model evaluation..."
+	@go run $(EVAL_GO_FILE) --variant small-model-comparison --config $(EVAL_CONFIG_FILE) --suite $(EVAL_SUITE_FILE) --results $(EVAL_RESULTS_DIR)
+
 eval-comprehensive:
 	@echo "Running comprehensive evaluation..."
 	@go run $(EVAL_GO_FILE) --variant full-comprehensive --config $(EVAL_CONFIG_FILE) --suite $(EVAL_SUITE_FILE) --results $(EVAL_RESULTS_DIR)
 
 eval-clean:
 	@echo "Cleaning evaluation results..."
-	@rm -rf $(EVAL_RESULTS_DIR)/*.json
+	@rm -rf $(EVAL_RESULTS_DIR)
 	@echo "Evaluation cleanup complete."
