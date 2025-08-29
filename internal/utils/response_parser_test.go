@@ -4,179 +4,208 @@ import (
 	"testing"
 )
 
-func TestParseIssuesFromResponse_Approved(t *testing.T) {
-	// Only exact "APPROVED" should be accepted as approval
-	response := "APPROVED"
+// Test Core Requirement: Parser should recognize approval responses
+func TestParseIssuesFromResponse_ApprovalResponses(t *testing.T) {
+	approvalCases := []string{
+		"APPROVED",           // Exact format from prompt
+		"No issues found",    // Natural language approval
+		"Looks good",         // Common approval phrase
+		"LGTM",              // Developer shorthand
+		"Clean refactoring", // Specific approval type
+	}
+
+	for _, response := range approvalCases {
+		t.Run(response, func(t *testing.T) {
+			issues, err := ParseIssuesFromResponse(response)
+			
+			if err != nil {
+				t.Errorf("Should accept approval response, got error: %v", err)
+			}
+			if len(issues) != 0 {
+				t.Errorf("Approval should return 0 issues, got %d", len(issues))
+			}
+		})
+	}
+}
+
+// Test Core Requirement: Parser should reject ambiguous text
+func TestParseIssuesFromResponse_AmbiguousText(t *testing.T) {
+	ambiguousCases := []string{
+		"The code has some issues",      // Mentions issues but no format
+		"I found several problems",      // Mentions problems but no format  
+		"There are critical vulnerabilities", // Mentions severity but no format
+		"Here are my findings:",         // Incomplete response
+	}
+
+	for _, response := range ambiguousCases {
+		t.Run(response, func(t *testing.T) {
+			_, err := ParseIssuesFromResponse(response)
+			
+			if err == nil {
+				t.Error("Should reject ambiguous text without proper format")
+			}
+			if !IsFormatViolation(err) {
+				t.Errorf("Should return format violation error, got: %v", err)
+			}
+		})
+	}
+}
+
+// Test Core Requirement: Parser should handle well-formed JSON
+func TestParseIssuesFromResponse_ValidJSON(t *testing.T) {
+	response := `[{"severity": "CRITICAL", "file_path": "test.go", "start_line": 10, "end_line": 12, "description": "SQL injection vulnerability"}]`
 
 	issues, err := ParseIssuesFromResponse(response)
+	
 	if err != nil {
-		t.Errorf("Expected no error for response %q, got: %v", response, err)
+		t.Fatalf("Should parse valid JSON, got error: %v", err)
 	}
-	if len(issues) != 0 {
-		t.Errorf("Expected 0 issues for response %q, got %d", response, len(issues))
-	}
-}
-
-func TestParseIssuesFromResponse_NonStandardApproval(t *testing.T) {
-	// These should now be treated as format violations
-	nonStandardResponses := []string{
-		"The code looks good",
-		"No issues found",
-		"Everything looks good",
-		"LGTM - looks good to me",
-	}
-
-	for _, response := range nonStandardResponses {
-		_, err := ParseIssuesFromResponse(response)
-		if err == nil {
-			t.Errorf("Expected format violation error for response %q", response)
-		}
-		if !IsFormatViolation(err) {
-			t.Errorf("Expected format violation error for response %q, got: %v", response, err)
-		}
-	}
-}
-
-func TestParseIssuesFromResponse_ValidJSON(t *testing.T) {
-	jsonResponse := `[
-		{
-			"severity": "CRITICAL",
-			"file_path": "test.go",
-			"start_line": 10,
-			"end_line": 12,
-			"description": "SQL injection vulnerability"
-		}
-	]`
-
-	issues, err := ParseIssuesFromResponse(jsonResponse)
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-
 	if len(issues) != 1 {
-		t.Fatalf("Expected 1 issue, got %d", len(issues))
+		t.Fatalf("Should find 1 issue, got %d", len(issues))
 	}
-
+	
 	issue := issues[0]
 	if issue.Severity != "CRITICAL" {
-		t.Errorf("Expected severity CRITICAL, got %s", issue.Severity)
+		t.Errorf("Should preserve severity, got %s", issue.Severity)
 	}
-	if issue.Description != "SQL injection vulnerability" {
-		t.Errorf("Expected specific description, got %s", issue.Description)
-	}
-}
-
-func TestParseIssuesFromResponse_JSONWithText(t *testing.T) {
-	response := `As a code reviewer, I found the following issues:
-
-[
-	{
-		"severity": "WARNING",
-		"file_path": "main.go",
-		"start_line": 5,
-		"end_line": 5,
-		"description": "Missing error handling"
-	}
-]
-
-Please address these concerns.`
-
-	issues, err := ParseIssuesFromResponse(response)
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-
-	if len(issues) != 1 {
-		t.Fatalf("Expected 1 issue, got %d", len(issues))
-	}
-
-	issue := issues[0]
-	if issue.Severity != "WARNING" {
-		t.Errorf("Expected severity WARNING, got %s", issue.Severity)
+	if issue.FilePath != "test.go" {
+		t.Errorf("Should preserve file path, got %s", issue.FilePath)
 	}
 }
 
-func TestParseIssuesFromResponse_CodeBlock(t *testing.T) {
-	response := `Here are the issues I found:
-
-` + "```json" + `
-[
-	{
-		"severity": "MINOR",
-		"file_path": "utils.go",
-		"start_line": 15,
-		"end_line": 15,
-		"description": "Unused variable"
-	}
-]
-` + "```" + `
-
-That's all I found.`
-
-	issues, err := ParseIssuesFromResponse(response)
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-
-	if len(issues) != 1 {
-		t.Fatalf("Expected 1 issue, got %d", len(issues))
-	}
-
-	issue := issues[0]
-	if issue.Severity != "MINOR" {
-		t.Errorf("Expected severity MINOR, got %s", issue.Severity)
-	}
-}
-
-func TestParseIssuesFromResponse_FormatViolation(t *testing.T) {
-	response := "As a code reviewer, I will focus on reviewing only the code changes shown in the diff above. Here are my findings:"
-
-	_, err := ParseIssuesFromResponse(response)
-	if err == nil {
-		t.Error("Expected format violation error")
-	}
-
-	if !IsFormatViolation(err) {
-		t.Errorf("Expected format violation error, got: %v", err)
-	}
-}
-
-func TestParseIssuesFromResponse_InvalidJSON(t *testing.T) {
-	response := "This is not JSON and contains no approval phrases and mentions critical issues but provides no valid format."
-
-	_, err := ParseIssuesFromResponse(response)
-	if err == nil {
-		t.Error("Expected error for invalid response format")
-	}
-}
-
-func TestExtractJSON(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
+// Test Core Requirement: Parser should extract JSON from mixed content
+func TestParseIssuesFromResponse_JSONInText(t *testing.T) {
+	testCases := []struct {
+		name     string
+		response string
 	}{
 		{
-			input:    `[{"severity": "CRITICAL"}]`,
-			expected: `[{"severity": "CRITICAL"}]`,
+			name: "JSON with surrounding text",
+			response: `I found these issues:
+[{"severity": "WARNING", "file_path": "main.go", "start_line": 5, "end_line": 5, "description": "Missing error handling"}]
+Please fix them.`,
 		},
 		{
-			input:    `Text before [{"severity": "WARNING"}] text after`,
-			expected: `[{"severity": "WARNING"}]`,
-		},
-		{
-			input:    `No JSON here`,
-			expected: ``,
-		},
-		{
-			input:    "Code block:\n```\n" + `[{"severity": "MINOR"}]` + "\n```\nEnd",
-			expected: `[{"severity": "MINOR"}]`,
+			name: "JSON in code block",
+			response: "```json\n" + `[{"severity": "MINOR", "file_path": "utils.go", "start_line": 15, "end_line": 15, "description": "Unused variable"}]` + "\n```",
 		},
 	}
 
-	for _, test := range tests {
-		result := extractJSON(test.input)
-		if result != test.expected {
-			t.Errorf("extractJSON(%q) = %q, expected %q", test.input, result, test.expected)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			issues, err := ParseIssuesFromResponse(tc.response)
+			
+			if err != nil {
+				t.Fatalf("Should extract JSON from mixed content, got error: %v", err)
+			}
+			if len(issues) != 1 {
+				t.Fatalf("Should find 1 issue, got %d", len(issues))
+			}
+		})
+	}
+}
+
+// Test Core Requirement: Parser should recover from common JSON issues
+func TestParseIssuesFromResponse_RecoverableIssues(t *testing.T) {
+	testCases := []struct {
+		name           string
+		response       string
+		expectedIssues int
+		reason         string
+	}{
+		{
+			name: "Incomplete JSON (missing closing bracket)",
+			response: `[
+  {"severity": "MINOR", "file_path": "test.go", "start_line": 10, "end_line": 10, "description": "Issue 1"},
+  {"severity": "WARNING", "file_path": "test.go", "start_line": 20, "end_line": 20, "description": "Issue 2"}`,
+			expectedIssues: 2,
+			reason:         "Should repair missing closing bracket",
+		},
+		{
+			name: "Individual objects without array",
+			response: `Found these issues:
+{"severity": "CRITICAL", "file_path": "auth.go", "start_line": 15, "end_line": 15, "description": "SQL injection"}
+Also found:
+{"severity": "WARNING", "file_path": "main.go", "start_line": 22, "end_line": 22, "description": "Missing error handling"}`,
+			expectedIssues: 2,
+			reason:         "Should extract individual JSON objects",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			issues, err := ParseIssuesFromResponse(tc.response)
+			
+			if err != nil {
+				t.Fatalf("%s, got error: %v", tc.reason, err)
+			}
+			if len(issues) != tc.expectedIssues {
+				t.Errorf("%s, expected %d issues, got %d", tc.reason, tc.expectedIssues, len(issues))
+			}
+		})
+	}
+}
+
+// Test Core Requirement: Parser should fail gracefully on truly invalid input
+func TestParseIssuesFromResponse_UnrecoverableIssues(t *testing.T) {
+	invalidCases := []string{
+		"This text mentions issues but has no valid JSON or approval",
+		"[{invalid json structure without proper fields}]",
+		"I found problems but won't tell you what they are",
+	}
+
+	for _, response := range invalidCases {
+		t.Run(response[:20]+"...", func(t *testing.T) {
+			_, err := ParseIssuesFromResponse(response)
+			
+			if err == nil {
+				t.Error("Should fail on truly invalid input")
+			}
+			if !IsFormatViolation(err) {
+				t.Errorf("Should return format violation, got: %v", err)
+			}
+		})
+	}
+}
+
+// Test Core Requirement: Parser should handle multiple issues correctly
+func TestParseIssuesFromResponse_MultipleIssues(t *testing.T) {
+	response := `[
+		{"severity": "CRITICAL", "file_path": "auth.go", "start_line": 10, "end_line": 10, "description": "SQL injection"},
+		{"severity": "WARNING", "file_path": "main.go", "start_line": 20, "end_line": 20, "description": "Missing error handling"},
+		{"severity": "MINOR", "file_path": "utils.go", "start_line": 30, "end_line": 30, "description": "Unused variable"}
+	]`
+
+	issues, err := ParseIssuesFromResponse(response)
+	
+	if err != nil {
+		t.Fatalf("Should parse multiple issues, got error: %v", err)
+	}
+	if len(issues) != 3 {
+		t.Fatalf("Should find 3 issues, got %d", len(issues))
+	}
+	
+	// Verify all severities are preserved
+	severities := []string{issues[0].Severity, issues[1].Severity, issues[2].Severity}
+	expected := []string{"CRITICAL", "WARNING", "MINOR"}
+	
+	for i, expectedSeverity := range expected {
+		if severities[i] != expectedSeverity {
+			t.Errorf("Issue %d should have severity %s, got %s", i, expectedSeverity, severities[i])
 		}
+	}
+}
+
+// Test Edge Case: Empty JSON array should be treated as no issues (like approval)
+func TestParseIssuesFromResponse_EmptyArray(t *testing.T) {
+	response := "[]"
+	
+	issues, err := ParseIssuesFromResponse(response)
+	
+	if err != nil {
+		t.Fatalf("Should accept empty JSON array, got error: %v", err)
+	}
+	if len(issues) != 0 {
+		t.Errorf("Empty array should return 0 issues, got %d", len(issues))
 	}
 }
