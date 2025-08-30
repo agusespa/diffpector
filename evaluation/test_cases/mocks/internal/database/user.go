@@ -1,8 +1,10 @@
+//go:build ignore
+// +build ignore
+
 package database
 
 import (
 	"database/sql"
-	"fmt"
 )
 
 type User struct {
