@@ -26,7 +26,7 @@ var PromptVariants = map[string]types.PromptVariant{
 	},
 }
 
-const DEFAULT_PROMPT = "default"
+const DEFAULT_PROMPT = "optimized"
 
 func GetPromptVariant(name string) (types.PromptVariant, error) {
 	variant, exists := PromptVariants[name]

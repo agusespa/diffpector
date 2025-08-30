@@ -88,8 +88,26 @@ func TestValidateAndDetectLanguage(t *testing.T) {
 			expectError:  false,
 		},
 		{
-			name:          "unsupported language",
-			files:         []string{"script.py"},
+			name:         "html and css files",
+			files:        []string{"index.html", "styles.css"},
+			expectedLang: "",
+			expectError:  false,
+		},
+		{
+			name:         "mixed go with html and css",
+			files:        []string{"main.go", "index.html", "styles.css"},
+			expectedLang: "go",
+			expectError:  false,
+		},
+		{
+			name:         "python files",
+			files:        []string{"script.py"},
+			expectedLang: "python",
+			expectError:  false,
+		},
+		{
+			name:          "unsupported programming language",
+			files:         []string{"script.rb"},
 			expectedLang:  "",
 			expectError:   true,
 			errorContains: "unsupported language file",
