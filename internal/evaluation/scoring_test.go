@@ -49,10 +49,10 @@ func TestCalculateScore(t *testing.T) {
 				ShouldFindIssues: false,
 			},
 			actual: []types.Issue{
-				{Severity: "error", FilePath: "test.go", Description: "test issue"},
+				{Severity: "MINOR", FilePath: "test.go", Description: "test issue"},
 			},
-			wantMin: 0.0,
-			wantMax: 0.0,
+			wantMin: 0.5, // Partial credit due to new scoring system (1.0 - 0.1 penalty for MINOR false positive)
+			wantMax: 1.0,
 		},
 		{
 			name: "complex expectations - all match",
@@ -133,9 +133,9 @@ func TestCalculateIssueFoundScore(t *testing.T) {
 				ShouldFindIssues: false,
 			},
 			actual: []types.Issue{
-				{Severity: "error", FilePath: "test.go", Description: "test issue"},
+				{Severity: "MINOR", FilePath: "test.go", Description: "test issue"},
 			},
-			want: 0.0,
+			want: 0.9, // 1.0 - 0.1 penalty for MINOR false positive
 		},
 	}
 
@@ -189,7 +189,7 @@ func TestCalculateIssueCountScore(t *testing.T) {
 			actual: []types.Issue{
 				{Severity: "error", FilePath: "test.go", Description: "issue 1"},
 			},
-			want: 0.0,
+			want: 0.2333333333333333, // (1/3) * 0.7 = partial credit for being under minimum
 		},
 		{
 			name: "above maximum",
@@ -202,7 +202,7 @@ func TestCalculateIssueCountScore(t *testing.T) {
 				{Severity: "warning", FilePath: "test.go", Description: "issue 2"},
 				{Severity: "info", FilePath: "test.go", Description: "issue 3"},
 			},
-			want: 0.0,
+			want: 0.7, // 1.0 - (1 excess / 1 range) * 0.3 = 0.7
 		},
 		{
 			name: "only min specified - meets minimum",

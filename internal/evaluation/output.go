@@ -24,10 +24,23 @@ func PrintEvaluationSummary(r *types.EvaluationResult) {
 	fmt.Printf("  Total Duration: %.2fs\n", r.TotalDuration.Seconds())
 
 	if r.TotalRuns > 1 {
-		fmt.Printf("\n  Test Case Consistency:\n")
+		fmt.Printf("\n  Test Case Performance:\n")
 		for _, stats := range r.TestCaseStats {
-			fmt.Printf("    %s: %.2f avg (±%.3f) - %.1f%% consistent\n",
-				stats.TestCaseName, stats.AverageScore, stats.ScoreStdDev, stats.ConsistencyScore*100)
+			// Add quality indicator
+			var qualityIndicator string
+			if stats.QualityScore >= 0.8 {
+				qualityIndicator = "🟢 GOOD"
+			} else if stats.QualityScore >= 0.5 {
+				qualityIndicator = "🟡 MIXED"
+			} else if stats.AverageScore < 0.3 && stats.ConsistencyScore > 0.8 {
+				qualityIndicator = "🔴 CONSISTENTLY BAD"
+			} else {
+				qualityIndicator = "🔴 POOR"
+			}
+			
+			fmt.Printf("    %s: %.2f avg (±%.3f) - %.1f%% consistent - Quality: %.2f %s\n",
+				stats.TestCaseName, stats.AverageScore, stats.ScoreStdDev, 
+				stats.ConsistencyScore*100, stats.QualityScore, qualityIndicator)
 		}
 	}
 	fmt.Println()

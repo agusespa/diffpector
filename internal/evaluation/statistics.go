@@ -83,12 +83,16 @@ func (s *StatisticsCalculator) calculateTestCaseStats(result *types.EvaluationRe
 			}
 		}
 
+		avgScore := s.CalculateMean(scores)
+		consistency := s.CalculateConsistency(scores)
+		
 		result.TestCaseStats[testName] = types.TestCaseStats{
 			TestCaseName:     testName,
-			AverageScore:     s.CalculateMean(scores),
+			AverageScore:     avgScore,
 			ScoreStdDev:      s.CalculateStdDev(scores),
 			SuccessRate:      float64(successCount) / float64(len(successes)) * 100,
-			ConsistencyScore: s.CalculateConsistency(scores),
+			ConsistencyScore: consistency,
+			QualityScore:     s.CalculateQualityScore(avgScore, consistency),
 		}
 	}
 }
@@ -160,4 +164,27 @@ func (s *StatisticsCalculator) CalculateConsistency(values []float64) float64 {
 		consistency = 1.0
 	}
 	return consistency
+}
+
+// CalculateQualityScore combines average score and consistency to distinguish
+// between "consistently good" vs "consistently bad" performance
+func (s *StatisticsCalculator) CalculateQualityScore(avgScore, consistency float64) float64 {
+	// Quality score rewards high performance AND consistency
+	// - High score + High consistency = Excellent (close to 1.0)
+	// - High score + Low consistency = Good but unreliable (0.5-0.8)
+	// - Low score + High consistency = Consistently bad (close to 0.0)
+	// - Low score + Low consistency = Poor and unreliable (close to 0.0)
+	
+	// Weight: 70% performance, 30% consistency bonus/penalty
+	baseScore := avgScore * 0.7
+	
+	// Consistency bonus: only positive if avgScore > 0.5, otherwise it's a penalty
+	if avgScore > 0.5 {
+		consistencyBonus := consistency * 0.3
+		return baseScore + consistencyBonus
+	} else {
+		// For low scores, high consistency is actually bad (consistently failing)
+		consistencyPenalty := consistency * 0.3
+		return baseScore - consistencyPenalty
+	}
 }

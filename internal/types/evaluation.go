@@ -74,6 +74,7 @@ type TestCaseStats struct {
 	ScoreStdDev      float64 `json:"score_std_dev"`
 	SuccessRate      float64 `json:"success_rate"`
 	ConsistencyScore float64 `json:"consistency_score"` // How consistent the results are
+	QualityScore     float64 `json:"quality_score"`     // Combines performance and consistency (high score + high consistency = good, low score + high consistency = bad)
 }
 
 // TestCaseResult represents the result of a single test case evaluation
