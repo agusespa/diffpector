@@ -1,0 +1,45 @@
+/* Main stylesheet */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+    color: white;
+    padding: 40px 0;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.card {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    margin: 20px 0;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transform: translateY(0);
+}
+
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}

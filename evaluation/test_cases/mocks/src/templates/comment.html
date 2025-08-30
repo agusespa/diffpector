@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Comments</title>
+</head>
+<body>
+    <div class="comment-section">
+        <h2>User Comments</h2>
+        
+        <div class="comment" id="comment-{{comment.id}}">
+            <div class="comment-header">
+                <span class="username">{{username}}</span>
+                <span class="timestamp">{{timestamp}}</span>
+            </div>
+            <div class="comment-body">{{comment_text}}</div>
+        </div>
+        
+        <form class="add-comment" method="post" action="/add-comment">
+            <div class="form-group">
+                <label for="comment">Add a comment:</label>
+                <textarea id="comment" name="comment" rows="4" cols="50"></textarea>
+            </div>
+            <button type="submit">Post Comment</button>
+        </form>
+        
+        <script>
+            // Display user messages
+            function displayMessage(message) {
+                document.getElementById('message').innerHTML = message;
+            }
+            
+            // Auto-refresh comments
+            setInterval(() => {
+                fetch('/api/comments')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('comments').innerHTML = data.html;
+                    });
+            }, 5000);
+        </script>
+    </div>
+</body>
+</html>

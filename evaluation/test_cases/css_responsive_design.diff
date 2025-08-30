@@ -1,0 +1,78 @@
+diff --git a/src/styles/layout.css b/src/styles/layout.css
+index 1234567..abcdefg 100644
+--- a/src/styles/layout.css
++++ b/src/styles/layout.css
+@@ -1,20 +1,35 @@
+ /* Layout styles */
+ 
+ .grid-container {
+-    display: flex;
+-    flex-wrap: wrap;
+-    gap: 20px;
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
++    gap: 1.25rem;
+     padding: 20px;
+ }
+ 
+ .grid-item {
+-    flex: 1 1 300px;
+-    min-width: 300px;
+     background: #f8f9fa;
+-    padding: 20px;
+-    border-radius: 8px;
++    padding: 1.25rem;
++    border-radius: 0.5rem;
++    min-height: 200px;
+ }
+ 
++@media (max-width: 768px) {
++    .grid-container {
++        grid-template-columns: 1fr;
++        padding: 1rem;
++        gap: 1rem;
++    }
++    
++    .grid-item {
++        padding: 1rem;
++    }
++}
++
++@media (max-width: 480px) {
++    .grid-container {
++        padding: 0.5rem;
++    }
++}
++
+ .navigation {
+-    position: fixed;
++    position: sticky;
+     top: 0;
+-    width: 100%;
++    width: 100%;
+     background: white;
+-    z-index: 1000;
+-    padding: 10px 0;
++    z-index: 100;
++    padding: 0.625rem 0;
+     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+ }
+ 
+@@ -35,8 +50,13 @@
+     gap: 30px;
+ }
+ 
++@media (max-width: 768px) {
++    .nav-links {
++        flex-direction: column;
++        gap: 1rem;
++    }
++}
++
+ .nav-links a {
+     text-decoration: none;
+     color: #333;
+-    font-weight: 500;
++    font-weight: 500;
+     transition: color 0.2s ease;
+ }

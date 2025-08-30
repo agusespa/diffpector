@@ -1,0 +1,47 @@
+diff --git a/src/templates/comment.html b/src/templates/comment.html
+index 1234567..abcdefg 100644
+--- a/src/templates/comment.html
++++ b/src/templates/comment.html
+@@ -8,12 +8,12 @@
+     <div class="comment-section">
+         <h2>User Comments</h2>
+         
+-        <div class="comment" id="comment-{{comment.id}}">
++        <div class="comment" id="comment-{{comment.id}}">
+             <div class="comment-header">
+-                <span class="username">{{username}}</span>
++                <span class="username">{{username}}</span>
+                 <span class="timestamp">{{timestamp}}</span>
+             </div>
+-            <div class="comment-body">{{comment_text}}</div>
++            <div class="comment-body">{{comment_text}}</div>
+         </div>
+         
+         <form class="add-comment" method="post" action="/add-comment">
+@@ -21,7 +21,7 @@
+                 <label for="comment">Add a comment:</label>
+                 <textarea id="comment" name="comment" rows="4" cols="50"></textarea>
+             </div>
+-            <button type="submit">Post Comment</button>
++            <button type="submit">Post Comment</button>
+         </form>
+         
+         <script>
+@@ -29,7 +29,7 @@
+             function displayMessage(message) {
+-                document.getElementById('message').innerHTML = message;
++                document.getElementById('message').innerHTML = message;
+             }
+             
+             // Auto-refresh comments
+-            setInterval(() => {
++            setInterval(() => {
+                 fetch('/api/comments')
+                     .then(response => response.json())
+-                    .then(data => {
++                    .then(data => {
+-                        document.getElementById('comments').innerHTML = data.html;
++                        document.getElementById('comments').innerHTML = data.html;
+                     });
+             }, 5000);
+         </script>
