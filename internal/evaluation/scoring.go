@@ -19,10 +19,12 @@ func CalculateScore(expected types.ExpectedResults, actual []types.Issue) float6
 	}
 
 	var totalScore, applicableMetrics float64
-	for _, score := range scores {
+	weights := []float64{0.4, 0.3, 0.2, 0.1} // Weight issue detection most heavily
+	
+	for i, score := range scores {
 		if score >= 0 { // -1 means not applicable
-			totalScore += score
-			applicableMetrics++
+			totalScore += score * weights[i]
+			applicableMetrics += weights[i]
 		}
 	}
 
@@ -30,7 +32,17 @@ func CalculateScore(expected types.ExpectedResults, actual []types.Issue) float6
 		return 1.0 // No expectations, full score
 	}
 
-	return totalScore / applicableMetrics
+	finalScore := totalScore / applicableMetrics
+	
+	// Ensure score is between 0 and 1
+	if finalScore > 1.0 {
+		finalScore = 1.0
+	}
+	if finalScore < 0.0 {
+		finalScore = 0.0
+	}
+	
+	return finalScore
 }
 
 // calculateIssueFoundScore checks if issues were found when expected
@@ -39,6 +51,39 @@ func calculateIssueFoundScore(expected types.ExpectedResults, actual []types.Iss
 	if expected.ShouldFindIssues == hasIssues {
 		return 1.0
 	}
+	
+	// Partial scoring: if we expected issues but found none, give some credit for not having false positives
+	// if we expected no issues but found some, penalize based on severity and count
+	if expected.ShouldFindIssues && !hasIssues {
+		return 0.0 // Complete miss - no partial credit
+	}
+	
+	if !expected.ShouldFindIssues && hasIssues {
+		// False positives - penalize based on severity
+		criticalCount := 0
+		warningCount := 0
+		minorCount := 0
+		
+		for _, issue := range actual {
+			switch issue.Severity {
+			case "CRITICAL":
+				criticalCount++
+			case "WARNING":
+				warningCount++
+			case "MINOR":
+				minorCount++
+			}
+		}
+		
+		// Heavy penalty for critical false positives, lighter for minor ones
+		penalty := float64(criticalCount)*0.5 + float64(warningCount)*0.3 + float64(minorCount)*0.1
+		score := 1.0 - penalty
+		if score < 0 {
+			score = 0
+		}
+		return score
+	}
+	
 	return 0.0
 }
 
@@ -55,6 +100,30 @@ func calculateIssueCountScore(expected types.ExpectedResults, actual []types.Iss
 	if minOk && maxOk {
 		return 1.0
 	}
+	
+	// Partial scoring based on how close we are to the expected range
+	if expected.MinIssues > 0 && count < expected.MinIssues {
+		// Too few issues found - partial credit based on how close we got
+		ratio := float64(count) / float64(expected.MinIssues)
+		return ratio * 0.7 // Max 70% credit for being under
+	}
+	
+	if expected.MaxIssues > 0 && count > expected.MaxIssues {
+		// Too many issues found - penalize based on how far over
+		excess := count - expected.MaxIssues
+		expectedRange := expected.MaxIssues - expected.MinIssues
+		if expectedRange == 0 {
+			expectedRange = expected.MaxIssues
+		}
+		
+		penalty := float64(excess) / float64(expectedRange)
+		score := 1.0 - (penalty * 0.3) // Reduce score by 30% per range-width of excess
+		if score < 0.2 {
+			score = 0.2 // Minimum 20% credit for finding issues in the right area
+		}
+		return score
+	}
+	
 	return 0.0
 }
 
@@ -64,19 +133,42 @@ func calculateSeverityMatchScore(expected types.ExpectedResults, actual []types.
 		return -1.0 // Not applicable
 	}
 
-	actualSeverities := make(map[string]bool)
+	actualSeverities := make(map[string]int)
 	for _, issue := range actual {
-		actualSeverities[issue.Severity] = true
+		actualSeverities[issue.Severity]++
 	}
 
 	matchCount := 0
+	partialMatchScore := 0.0
+	
 	for _, expectedSev := range expected.ExpectedSeverity {
-		if actualSeverities[expectedSev] {
+		if actualSeverities[expectedSev] > 0 {
 			matchCount++
+		} else {
+			// Partial credit for related severities
+			switch expectedSev {
+			case "CRITICAL":
+				if actualSeverities["WARNING"] > 0 {
+					partialMatchScore += 0.3 // 30% credit for WARNING when expecting CRITICAL
+				}
+			case "WARNING":
+				if actualSeverities["CRITICAL"] > 0 {
+					partialMatchScore += 0.7 // 70% credit for CRITICAL when expecting WARNING
+				} else if actualSeverities["MINOR"] > 0 {
+					partialMatchScore += 0.2 // 20% credit for MINOR when expecting WARNING
+				}
+			case "MINOR":
+				if actualSeverities["WARNING"] > 0 {
+					partialMatchScore += 0.5 // 50% credit for WARNING when expecting MINOR
+				}
+			}
 		}
 	}
 
-	return float64(matchCount) / float64(len(expected.ExpectedSeverity))
+	fullMatchScore := float64(matchCount) / float64(len(expected.ExpectedSeverity))
+	partialScore := partialMatchScore / float64(len(expected.ExpectedSeverity))
+	
+	return fullMatchScore + partialScore
 }
 
 // calculateFileMatchScore checks if expected files have issues
