@@ -463,6 +463,66 @@
         "category": "responsive",
         "language": "css"
       }
+    },
+    {
+      "name": "c_security_buffer_overflow",
+      "description": "Test detection of buffer overflow vulnerabilities in C",
+      "diff_file": "c_buffer_overflow.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL"],
+        "min_issues": 3,
+        "max_issues": 6
+      },
+      "metadata": {
+        "category": "security",
+        "language": "c"
+      }
+    },
+    {
+      "name": "c_memory_management_issues",
+      "description": "Test detection of memory leaks, double free, and malloc/free mismatches",
+      "diff_file": "c_memory_management.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 4,
+        "max_issues": 8
+      },
+      "metadata": {
+        "category": "memory",
+        "language": "c"
+      }
+    },
+    {
+      "name": "c_security_format_string",
+      "description": "Test detection of format string vulnerabilities in printf family functions",
+      "diff_file": "c_format_string_vuln.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL"],
+        "min_issues": 3,
+        "max_issues": 5
+      },
+      "metadata": {
+        "category": "security",
+        "language": "c"
+      }
+    },
+    {
+      "name": "c_pointer_arithmetic_errors",
+      "description": "Test detection of dangerous pointer arithmetic and bounds checking issues",
+      "diff_file": "c_pointer_arithmetic.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": ["CRITICAL", "WARNING"],
+        "min_issues": 3,
+        "max_issues": 6
+      },
+      "metadata": {
+        "category": "memory",
+        "language": "c"
+      }
     }
   ]
 }

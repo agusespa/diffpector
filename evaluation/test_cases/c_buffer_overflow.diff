@@ -1,0 +1,43 @@
+diff --git a/src/utils/string_utils.c b/src/utils/string_utils.c
+index 1234567..abcdefg 100644
+--- a/src/utils/string_utils.c
++++ b/src/utils/string_utils.c
+@@ -8,8 +8,8 @@
+ 
+ int copy_user_input(const char* input) {
+     char buffer[64];
+-    if (strlen(input) >= sizeof(buffer)) {
+-        return -1; // Input too long
+-    }
+-    strncpy(buffer, input, sizeof(buffer) - 1);
+-    buffer[sizeof(buffer) - 1] = '\0';
++    // Remove length check - potential buffer overflow
++    strcpy(buffer, input);
+     
+     printf("Processed: %s\n", buffer);
+     return 0;
+@@ -18,10 +18,8 @@ int copy_user_input(const char* input) {
+ void process_network_data(char* data, size_t len) {
+     char response[256];
+     
+-    if (len >= sizeof(response)) {
+-        len = sizeof(response) - 1;
+-    }
+-    memcpy(response, data, len);
+-    response[len] = '\0';
++    // Direct copy without bounds checking
++    memcpy(response, data, len);
++    response[len] = '\0'; // Potential out-of-bounds write
+     
+     send_response(response);
+ }
+@@ -30,9 +28,7 @@ void process_network_data(char* data, size_t len) {
+ int format_message(const char* template, const char* user_data) {
+     char message[128];
+     
+-    snprintf(message, sizeof(message), template, user_data);
++    sprintf(message, template, user_data); // No bounds checking
+     
+     log_message(message);
+     return 0;
+ }

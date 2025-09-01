@@ -1,0 +1,40 @@
+diff --git a/src/logging/logger.c b/src/logging/logger.c
+index 1234567..abcdefg 100644
+--- a/src/logging/logger.c
++++ b/src/logging/logger.c
+@@ -15,8 +15,8 @@ void log_user_action(const char* username, const char* action) {
+     time_t now = time(NULL);
+     char* timestamp = ctime(&now);
+     
+-    fprintf(log_file, "[%s] User %s performed action: %s\n", 
+-            timestamp, username, action);
++    // Format string vulnerability - user input as format string
++    fprintf(log_file, action);
+ }
+ 
+ void log_error_message(int error_code, const char* user_message) {
+@@ -24,15 +24,13 @@ void log_error_message(int error_code, const char* user_message) {
+         return;
+     }
+     
+-    fprintf(stderr, "Error %d: %s\n", error_code, user_message);
++    // Direct user input to printf - format string attack vector
++    printf(user_message);
+ }
+ 
+ void debug_print(const char* format, const char* user_data) {
+     if (debug_enabled) {
+-        char safe_buffer[256];
+-        snprintf(safe_buffer, sizeof(safe_buffer), format, user_data);
+-        printf("DEBUG: %s\n", safe_buffer);
++        printf(user_data); // User data as format string
+     }
+ }
+ 
+@@ -41,6 +39,6 @@ void audit_log(const char* event_type, const char* details) {
+         return;
+     }
+     
+-    syslog(LOG_INFO, "AUDIT: %s - %s", event_type, details);
++    syslog(LOG_INFO, details); // Syslog format string vulnerability
+ }

@@ -62,6 +62,12 @@ func NewParserRegistry() *ParserRegistry {
 	}
 	registry.RegisterParser(pythonParser)
 
+	cParser, err := NewCParser()
+	if err != nil {
+		panic(fmt.Errorf("failed to create C parser: %w", err))
+	}
+	registry.RegisterParser(cParser)
+
 	return registry
 }
 
@@ -103,7 +109,7 @@ func (pr *ParserRegistry) IsKnownLanguage(filePath string) bool {
 
 	switch ext {
 	case ".go", ".java", ".js", ".ts", ".tsx", ".py", ".rb", ".php",
-		".cs", ".cpp", ".cc", ".cxx", ".c", ".rs", ".kt",
+		".cs", ".cpp", ".cc", ".cxx", ".c", ".h", ".rs", ".kt",
 		".scala", ".swift":
 		return true
 	default:

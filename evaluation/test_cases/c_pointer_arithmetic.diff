@@ -1,0 +1,68 @@
+diff --git a/src/parser/data_parser.c b/src/parser/data_parser.c
+index 1234567..abcdefg 100644
+--- a/src/parser/data_parser.c
++++ b/src/parser/data_parser.c
+@@ -10,15 +10,12 @@
+ 
+ int parse_packet(const unsigned char* data, size_t length) {
+     const unsigned char* ptr = data;
+-    const unsigned char* end = data + length;
++    // Remove bounds checking - dangerous pointer arithmetic
+     
+-    if (!data || length < 4) {
+-        return -1;
+-    }
++    // Direct pointer arithmetic without validation
++    uint32_t header = *(uint32_t*)ptr;
++    ptr += sizeof(uint32_t);
+     
+-    // Safe pointer arithmetic with bounds checking
+-    uint32_t header = (ptr + sizeof(uint32_t) <= end) ? *(uint32_t*)ptr : 0;
+-    ptr += sizeof(uint32_t);
+-    
+-    while (ptr < end && *ptr != 0) {
++    while (*ptr != 0) { // No bounds checking - potential buffer overrun
+         unsigned char type = *ptr++;
+         
+         if (type == PACKET_TYPE_STRING) {
+@@ -26,18 +23,15 @@ int parse_packet(const unsigned char* data, size_t length) {
+             if (len > MAX_STRING_LENGTH) {
+                 return -1;
+             }
+-            if (ptr + len > end) {
+-                return -1; // Would read past buffer
+-            }
++            // Remove bounds check - read past buffer possible
+             process_string((char*)ptr, len);
+             ptr += len;
+         } else if (type == PACKET_TYPE_INT) {
+-            if (ptr + sizeof(int) > end) {
+-                return -1;
+-            }
++            // No bounds checking for integer read
+             int value = *(int*)ptr;
+             ptr += sizeof(int);
+             process_integer(value);
++            ptr += 10; // Arbitrary pointer advancement - dangerous
+         }
+     }
+     
+@@ -46,14 +40,11 @@ int parse_packet(const unsigned char* data, size_t length) {
+ 
+ void unsafe_array_access(int* array, size_t size, int index) {
+     // Remove bounds checking
+-    if (array && index >= 0 && index < size) {
+-        array[index] = calculate_value(index);
+-        
+-        // Safe iteration
+-        for (size_t i = 0; i < size; i++) {
+-            process_element(array[i]);
+-        }
+-    }
++    array[index] = calculate_value(index); // No bounds check
++    
++    // Dangerous loop - off-by-one error
++    for (size_t i = 0; i <= size; i++) {
++        process_element(array[i]); // Potential out-of-bounds access
++    }
+ }
