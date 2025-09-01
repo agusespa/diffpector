@@ -63,6 +63,7 @@ func (cp *CParser) ShouldExcludeFile(filePath, projectRoot string) bool {
 		".dll",           // Windows dynamic libraries
 		"cmakefiles/",    // CMake build files
 		".cmake/",        // CMake cache
+		".git/",          // Git directory
 	}
 
 	for _, pattern := range cExcludePatterns {

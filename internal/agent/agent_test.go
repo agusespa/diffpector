@@ -106,6 +106,18 @@ func TestValidateAndDetectLanguage(t *testing.T) {
 			expectError:  false,
 		},
 		{
+			name:         "script files only",
+			files:        []string{"deploy.sh", "setup.bash", "build.ps1"},
+			expectedLang: "",
+			expectError:  false,
+		},
+		{
+			name:         "mixed go with script files",
+			files:        []string{"main.go", "deploy.sh", "Dockerfile"},
+			expectedLang: "go",
+			expectError:  false,
+		},
+		{
 			name:          "unsupported programming language",
 			files:         []string{"script.rb"},
 			expectedLang:  "",

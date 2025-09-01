@@ -108,6 +108,8 @@ func (pr *ParserRegistry) IsKnownLanguage(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	switch ext {
+	case ".sh", ".bash", ".zsh", ".fish", ".ps1", ".bat", ".cmd":
+		return false
 	case ".go", ".java", ".js", ".ts", ".tsx", ".py", ".rb", ".php",
 		".cs", ".cpp", ".cc", ".cxx", ".c", ".h", ".rs", ".kt",
 		".scala", ".swift":
