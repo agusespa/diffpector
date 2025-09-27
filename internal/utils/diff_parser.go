@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,23 +8,13 @@ import (
 	"github.com/agusespa/diffpector/internal/types"
 )
 
-func GetDiffContext(diffData types.DiffData, allSymbols []types.Symbol) (types.ContextResult, error) {
-	fileContent, err := os.ReadFile(diffData.AbsolutePath)
-	if err != nil {
-		return types.ContextResult{}, fmt.Errorf("failed to read file: %w", err)
-	}
+func GetDiffContext(diffData types.DiffData, allSymbols []types.Symbol, fileContent []byte) (types.ContextResult, error) {
+	fileLines := strings.Split(string(fileContent), "\n")
 
-	changedLines := parseGitDiffForAddedLines(diffData.Diff)
-	if len(changedLines) == 0 {
+	changedLinesSet := getDiffChangedLines(diffData.Diff)
+	if len(changedLinesSet) == 0 {
 		return types.ContextResult{}, nil
 	}
-
-	changedLinesSet := make(map[int]bool)
-	for _, line := range changedLines {
-		changedLinesSet[line] = true
-	}
-
-	fileLines := strings.Split(string(fileContent), "\n")
 
 	var contextBlocks []string
 	var affectedSymbols []types.SymbolUsage
@@ -47,32 +35,41 @@ func GetDiffContext(diffData types.DiffData, allSymbols []types.Symbol) (types.C
 	}, nil
 }
 
-func parseGitDiffForAddedLines(diffContent string) []int {
-	var addedLines []int
+func getDiffChangedLines(diffContent string) map[int]bool {
+	addedLines := make(map[int]bool)
 	lines := strings.Split(diffContent, "\n")
 
 	hunkRegex := regexp.MustCompile(`^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@`)
 
-	var currentLine int
-	inHunk := false
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
 
-	for _, line := range lines {
-		if matches := hunkRegex.FindStringSubmatch(line); len(matches) > 1 {
-			startLine, _ := strconv.Atoi(matches[1])
-			currentLine = startLine
-			inHunk = true
+		matches := hunkRegex.FindStringSubmatch(line)
+		if len(matches) < 2 {
 			continue
 		}
 
-		if !inHunk {
+		startLine, err := strconv.Atoi(matches[1])
+		if err != nil {
 			continue
 		}
 
-		if strings.HasPrefix(line, "+") {
-			addedLines = append(addedLines, currentLine)
-			currentLine++
-		} else if strings.HasPrefix(line, " ") {
-			currentLine++
+		newFileLineNum := startLine
+		for i++; i < len(lines); i++ {
+			hunkLine := lines[i]
+
+			if strings.HasPrefix(hunkLine, "@@") {
+				i--
+				break
+			}
+
+			switch {
+			case strings.HasPrefix(hunkLine, "+"):
+				addedLines[newFileLineNum] = true
+				newFileLineNum++
+			case strings.HasPrefix(hunkLine, " "):
+				newFileLineNum++
+			}
 		}
 	}
 
