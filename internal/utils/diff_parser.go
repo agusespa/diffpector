@@ -2,128 +2,106 @@ package utils
 
 import (
 	"fmt"
-	"sort"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
+
+	"github.com/agusespa/diffpector/internal/types"
 )
 
-type LineRange struct {
-	Start int
-	Count int
+func GetDiffContext(diffData types.DiffData, allSymbols []types.Symbol) (types.ContextResult, error) {
+	fileContent, err := os.ReadFile(diffData.AbsolutePath)
+	if err != nil {
+		return types.ContextResult{}, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	changedLines := parseGitDiffForAddedLines(diffData.Diff)
+	if len(changedLines) == 0 {
+		return types.ContextResult{}, nil
+	}
+
+	changedLinesSet := make(map[int]bool)
+	for _, line := range changedLines {
+		changedLinesSet[line] = true
+	}
+
+	fileLines := strings.Split(string(fileContent), "\n")
+
+	var contextBlocks []string
+	var affectedSymbols []types.SymbolUsage
+
+	for _, symbol := range allSymbols {
+		if containsChangedLines(symbol, changedLinesSet) {
+			affectedSymbols = append(affectedSymbols, types.SymbolUsage{Symbol: symbol})
+			content := extractSymbolContent(symbol, fileLines)
+			if content != "" {
+				contextBlocks = append(contextBlocks, content)
+			}
+		}
+	}
+
+	return types.ContextResult{
+		Context:         strings.Join(contextBlocks, "\n\n"),
+		AffectedSymbols: affectedSymbols,
+	}, nil
 }
 
-// GetDiffContext extracts the actual changed line ranges, not the entire hunk ranges
-func GetDiffContext(diff string) map[string][]LineRange {
-	if diff == "" {
-		return make(map[string][]LineRange)
-	}
-	
-	context := make(map[string][]LineRange)
-	lines := strings.Split(diff, "\n")
+func parseGitDiffForAddedLines(diffContent string) []int {
+	var addedLines []int
+	lines := strings.Split(diffContent, "\n")
 
-	var currentFile string
-	var currentLineNum int
-	changedLines := make(map[string][]int) // Track individual changed line numbers
+	hunkRegex := regexp.MustCompile(`^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@`)
+
+	var currentLine int
+	inHunk := false
 
 	for _, line := range lines {
-		if strings.HasPrefix(line, "+++") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				currentFile = strings.TrimPrefix(parts[1], "b/")
-			}
-		} else if strings.HasPrefix(line, "@@") && currentFile != "" {
-			// Parse hunk header to get starting line number for new file
-			if hunkInfo := ParseHunkHeader(line); hunkInfo != nil {
-				currentLineNum = hunkInfo.Start
-			}
-		} else if currentFile != "" && currentLineNum > 0 {
-			if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
-				// Added line - this line number is changed
-				changedLines[currentFile] = append(changedLines[currentFile], currentLineNum)
-				currentLineNum++
-			} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
-				// Deleted line - the current line position is changed
-				changedLines[currentFile] = append(changedLines[currentFile], currentLineNum)
-				// Don't increment currentLineNum for deleted lines
-			} else if strings.HasPrefix(line, " ") {
-				// Context line - increment line number
-				currentLineNum++
-			}
-		}
-	}
-
-	// Convert individual line numbers to ranges
-	for file, lineNums := range changedLines {
-		if len(lineNums) == 0 {
+		if matches := hunkRegex.FindStringSubmatch(line); len(matches) > 1 {
+			startLine, _ := strconv.Atoi(matches[1])
+			currentLine = startLine
+			inHunk = true
 			continue
 		}
 
-		// Remove duplicates and sort line numbers
-		uniqueLines := make(map[int]bool)
-		for _, line := range lineNums {
-			uniqueLines[line] = true
-		}
-		
-		sortedLines := make([]int, 0, len(uniqueLines))
-		for line := range uniqueLines {
-			sortedLines = append(sortedLines, line)
-		}
-		sort.Ints(sortedLines)
-
-		// Group consecutive lines into ranges
-		if len(sortedLines) == 0 {
+		if !inHunk {
 			continue
 		}
-		
-		start := sortedLines[0]
-		count := 1
 
-		for i := 1; i < len(sortedLines); i++ {
-			if sortedLines[i] == sortedLines[i-1]+1 {
-				// Consecutive line, extend range
-				count++
-			} else {
-				// Gap found, save current range and start new one
-				context[file] = append(context[file], LineRange{Start: start, Count: count})
-				start = sortedLines[i]
-				count = 1
-			}
+		if strings.HasPrefix(line, "+") {
+			addedLines = append(addedLines, currentLine)
+			currentLine++
+		} else if strings.HasPrefix(line, " ") {
+			currentLine++
 		}
-
-		// Add final range
-		context[file] = append(context[file], LineRange{Start: start, Count: count})
 	}
 
-	return context
+	return addedLines
 }
 
-func ParseHunkHeader(header string) *LineRange {
-	// Example: @@ -1,4 +1,6 @@
-	fields := strings.Fields(header)
-	if len(fields) < 3 {
-		return nil
-	}
-
-	newRange := fields[2]
-	if !strings.HasPrefix(newRange, "+") {
-		return nil
-	}
-
-	newRange = strings.TrimPrefix(newRange, "+")
-	parts := strings.Split(newRange, ",")
-
-	start := 0
-	count := 1
-
-	if len(parts) > 0 {
-		if _, err := fmt.Sscanf(parts[0], "%d", &start); err != nil {
-			return nil
+func containsChangedLines(symbol types.Symbol, changedLines map[int]bool) bool {
+	for line := symbol.StartLine; line <= symbol.EndLine; line++ {
+		if changedLines[line] {
+			return true
 		}
 	}
-	if len(parts) > 1 {
-		if _, err := fmt.Sscanf(parts[1], "%d", &count); err != nil {
-			count = 1
-		}
+	return false
+}
+
+func extractSymbolContent(symbol types.Symbol, fileLines []string) string {
+	startLine := symbol.StartLine - 1
+	endLine := symbol.EndLine
+
+	if startLine < 0 {
+		startLine = 0
+	}
+	if endLine > len(fileLines) {
+		endLine = len(fileLines)
+	}
+	if startLine >= endLine {
+		return ""
 	}
 
-	return &LineRange{Start: start, Count: count}
+	symbolLines := fileLines[startLine:endLine]
+	return strings.Join(symbolLines, "\n")
 }

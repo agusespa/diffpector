@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"slices"
@@ -14,65 +13,98 @@ import (
 	"github.com/agusespa/diffpector/pkg/config"
 )
 
-var version = "dev"
-
 func main() {
-	showHelp := flag.Bool("help", false, "Show help message")
-	showVersion := flag.Bool("version", false, "Show version information")
-	flag.Parse()
-
-	if *showVersion {
-		fmt.Printf("diffpector version %s\n", version)
-		return
-	}
-
-	reportErr := agent.NotifyUserIfReportNotIgnored(".gitignore")
-	if reportErr != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", reportErr)
-		os.Exit(1)
-	}
-
-	configFile := flag.String("config", "config.json", "Path to configuration file")
-
-	cfg, err := config.LoadConfig(*configFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to load config from %s: %v\n", *configFile, err)
-		os.Exit(1)
-	}
-
-	if !slices.Contains(llm.SupportedProviders, cfg.LLM.Provider) {
-		fmt.Fprintf(os.Stderr, "Error: Unsupported LLM provider: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := utils.ValidateModel(cfg.LLM.Model); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-	utils.WarnIfUnapproved(cfg.LLM.Model)
-
 	fmt.Println("")
 	fmt.Println("=========================")
 	fmt.Println(" Diffpector Review Agent ")
 	fmt.Println("=========================")
 	fmt.Println("")
 
-	if *showHelp {
-		fmt.Println("Code Review Agent - AI-powered code review for staged Git changes")
-		fmt.Println()
-		fmt.Println("Usage:")
-		fmt.Printf("  %s [options]\n", os.Args[0])
-		fmt.Println()
-		fmt.Println("Options:")
-		flag.PrintDefaults()
-		fmt.Println()
-		fmt.Println("Examples:")
-		fmt.Printf("  %s                           # Use default config.json\n", os.Args[0])
-		fmt.Printf("  %s --config custom.json      # Use custom config\n", os.Args[0])
-		fmt.Printf("  %s --allow-remote            # Allow remote providers\n", os.Args[0])
-		fmt.Println()
-		return
+	if err := runMainMenu(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
+}
+
+func runMainMenu() error {
+	for {
+		fmt.Println("Welcome to Diffpector! Which mode do you want to run?")
+		fmt.Println()
+		fmt.Println("1. DIFF MODE: Review staged changes (local Git diff)")
+		fmt.Println("2. PR MODE: Review remote branch (compare with current branch)")
+		fmt.Println("3. Help")
+		fmt.Println("0. Exit")
+		fmt.Println()
+		fmt.Print("Enter your choice: ")
+
+		var choice string
+		_, err := fmt.Scanln(&choice)
+		if err != nil {
+			fmt.Printf("Error reading input: %v", err)
+			continue
+		}
+		fmt.Println()
+
+		switch choice {
+		case "1":
+			return runCodeReview("diff", "")
+		case "2":
+			fmt.Println("Branch Review")
+			fmt.Println("=============")
+			fmt.Println("Note: Make sure you're running from the Git repository root directory.")
+			fmt.Println("The tool will fetch the branch and compare it with your current branch.")
+			fmt.Println("Ensure your SSH keys are set up for the Git platform.")
+			fmt.Println()
+			fmt.Print("Enter the branch name to review (e.g., feature/new-login): ")
+			var branchName string
+			_, err := fmt.Scanln(&branchName)
+			if err != nil {
+				fmt.Printf("Error reading input: %v", err)
+				continue
+			}
+
+			if branchName == "" {
+				fmt.Println("Error: Branch name is required")
+				fmt.Println()
+				continue
+			}
+
+			fmt.Println()
+			return runCodeReview("branch", branchName)
+		case "3":
+			showHelp()
+			fmt.Println()
+			continue
+		case "0":
+			fmt.Println("Goodbye!")
+			return nil
+		default:
+			fmt.Printf("Invalid choice '%s'. Please enter a number between 0-3.\n", choice)
+			fmt.Println()
+			continue
+		}
+	}
+}
+
+func runCodeReview(mode, target string) error {
+	reportErr := agent.NotifyUserIfReportNotIgnored(".gitignore")
+	if reportErr != nil {
+		return fmt.Errorf("report check failed: %w", reportErr)
+	}
+
+	cfg, err := config.LoadConfig("diffpectrc.json")
+	if err != nil {
+		return fmt.Errorf("failed to load config from diffpectrc.json: %w", err)
+	}
+
+	if !slices.Contains(llm.SupportedProviders, cfg.LLM.Provider) {
+		return fmt.Errorf("unsupported LLM provider: %s", cfg.LLM.Provider)
+	}
+
+	if err := utils.ValidateModel(cfg.LLM.Model); err != nil {
+		return fmt.Errorf("model validation failed: %w", err)
+	}
+	utils.WarnIfUnapproved(cfg.LLM.Model)
 
 	providerConfig := llm.ProviderConfig{
 		Type:    llm.ProviderType(cfg.LLM.Provider),
@@ -82,16 +114,15 @@ func main() {
 
 	llmProvider, err := llm.NewProvider(providerConfig)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create LLM provider: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
 	fmt.Printf("Using %s API with %s model\n\n", cfg.LLM.Provider, llmProvider.GetModel())
 
 	parserRegistry := tools.NewParserRegistry()
-
 	toolRegistry := tools.NewRegistry()
 
+	rootDir := "."
 	toolsToRegister := map[tools.ToolName]tools.Tool{
 		tools.ToolNameGitDiff:        &tools.GitDiffTool{},
 		tools.ToolNameGitStagedFiles: &tools.GitStagedFilesTool{},
@@ -99,7 +130,8 @@ func main() {
 		tools.ToolNameWriteFile:      &tools.WriteFileTool{},
 		tools.ToolNameReadFile:       &tools.ReadFileTool{},
 		tools.ToolNameAppendFile:     &tools.AppendFileTool{},
-		tools.ToolNameSymbolContext:  tools.NewSymbolContextTool(".", parserRegistry),
+		tools.ToolNameSymbolContext:  tools.NewSymbolContextTool(rootDir, parserRegistry),
+		tools.ToolNameBranchFetch:    tools.NewBranchFetchTool(cfg),
 	}
 
 	for name, tool := range toolsToRegister {
@@ -108,8 +140,31 @@ func main() {
 
 	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
 
-	if err := codeReviewAgent.ReviewStagedChanges(); err != nil {
-		fmt.Fprintf(os.Stderr, "Code review failed: %v\n", err)
-		os.Exit(1)
+	switch mode {
+	case "diff":
+		return codeReviewAgent.ReviewStagedChanges()
+	case "branch":
+		return codeReviewAgent.ReviewBranch(target)
+	default:
+		return fmt.Errorf("invalid mode: %s", mode)
 	}
+}
+
+func showHelp() {
+	fmt.Println("Diffpector Review Agent")
+	fmt.Println("=======================")
+	fmt.Println()
+	fmt.Println("AI-powered code review for staged Git changes and pull/merge requests")
+	fmt.Println()
+	fmt.Println("Features:")
+	fmt.Println("• Local-only operation with Ollama - no cloud dependencies")
+	fmt.Println("• Multi-language support: Go, TypeScript, Java, Python, C")
+	fmt.Println("• Symbol-aware context analysis")
+	fmt.Println("• Support for remote branch comparison")
+	fmt.Println()
+	fmt.Println("Configuration:")
+	fmt.Println("• Place a diffrectrc.json file in the current directory")
+	fmt.Println("• For branch reviews, ensure SSH keys are set up for your Git platform")
+	fmt.Println("• Always run from your Git repository root for proper symbol analysis")
+	fmt.Println()
 }

@@ -4,18 +4,18 @@ import (
 	"strings"
 )
 
-func ParseStagedFiles(output string) []string {
-	if output == "" {
+func ParseStagedFiles(commandOutput string) []string {
+	if commandOutput == "" {
 		return []string{}
 	}
 
 	var files []string
-	lines := strings.SplitSeq(strings.TrimSpace(output), "\n")
+	filePaths := strings.SplitSeq(strings.TrimSpace(commandOutput), "\n")
 
-	for line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			files = append(files, line)
+	for file := range filePaths {
+		file = strings.TrimSpace(file)
+		if file != "" {
+			files = append(files, file)
 		}
 	}
 

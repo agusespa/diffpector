@@ -3,27 +3,76 @@ package tools
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/agusespa/diffpector/internal/types"
+	"github.com/sourcegraph/go-diff/diff"
 )
 
 type GitDiffTool struct{}
 
-func (t *GitDiffTool) Name() string {
-	return "git_diff"
+func (t *GitDiffTool) Name() ToolName {
+	return ToolNameGitDiff
 }
 
 func (t *GitDiffTool) Description() string {
-	return "Get the diff for staged changes (git diff --staged)"
+	return "Get list of diff organized by file"
 }
 
-func (t *GitDiffTool) Execute(args map[string]any) (string, error) {
-	cmd := exec.Command("git", "diff", "--staged")
-	output, err := cmd.Output()
+func (t *GitDiffTool) Execute(args map[string]any) (map[string]types.DiffData, error) {
+	rootCmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	repoRootBytes, err := rootCmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get staged diff: %w", err)
+		return nil, fmt.Errorf("failed to get repo root: %w", err)
+	}
+	repoRoot := strings.TrimSpace(string(repoRootBytes))
+
+	cmd := exec.Command("git", "diff", "--staged")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run git diff: %w", err)
 	}
 
-	return string(output), nil
+	fileDiffs, err := diff.ParseMultiFileDiff(out)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse diff: %w", err)
+	}
+
+	result := make(map[string]types.DiffData)
+
+	for _, fd := range fileDiffs {
+		name := fd.NewName
+		if name == "/dev/null" {
+			name = fd.OrigName
+		}
+		name = stripGitPrefix(name)
+
+		absPath := filepath.Join(repoRoot, name)
+
+		diffContentBytes, err := diff.PrintFileDiff(fd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to print diff for file %s: %w", name, err)
+		}
+
+		diffData := types.DiffData{
+			AbsolutePath: absPath,
+			Diff:         string(diffContentBytes),
+		}
+		result[name] = diffData
+	}
+
+	return result, nil
 }
+
+func stripGitPrefix(path string) string {
+	if strings.HasPrefix(path, "a/") || strings.HasPrefix(path, "b/") {
+		return path[2:]
+	}
+	return path
+}
+
+// TODO reveiw below this line
 
 type GitStagedFilesTool struct{}
 

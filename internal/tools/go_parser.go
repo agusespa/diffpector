@@ -38,9 +38,13 @@ func (gp *GoParser) SitterLanguage() *sitter.Language {
 	return gp.language
 }
 
+func (gp *GoParser) SupportedExtensions() []string {
+	return []string{`.go`}
+}
+
 func (gp *GoParser) ShouldExcludeFile(filePath, projectRoot string) bool {
 	lowerPath := strings.ToLower(filePath)
-	
+
 	if strings.HasSuffix(lowerPath, "_test.go") {
 		return true
 	}
@@ -60,107 +64,76 @@ func (gp *GoParser) ShouldExcludeFile(filePath, projectRoot string) bool {
 	return false
 }
 
-func (gp *GoParser) FindSymbolUsages(filePath, content, symbolName string) ([]types.SymbolUsage, error) {
-	src := []byte(content)
-	tree := gp.parser.Parse(src, nil)
+func (gp *GoParser) ParseFile(filePath string, content []byte) ([]types.Symbol, error) {
+	tree := gp.parser.Parse(content, nil)
 	if tree == nil {
-		return nil, fmt.Errorf("failed to parse Go file: tree-sitter returned nil")
+		return nil, fmt.Errorf("failed to parse Go file")
 	}
 	defer tree.Close()
 
-	var usages []types.SymbolUsage
+	packageName := gp.extractPackageName(tree.RootNode(), content)
 
-	// Query for identifier nodes that could be symbol usages
 	queryText := `
-	(call_expression
-		function: (identifier) @call)
-	(call_expression
-		function: (selector_expression
-			field: (field_identifier) @method_call))
-	(identifier) @identifier
+	[
+	  ;; === Declarations ===
+	  (function_declaration name: (identifier) @func_decl)
+	  (method_declaration name: (field_identifier) @method_decl)
+	  (type_spec name: (type_identifier) @type_decl)
+	  (const_spec name: (identifier) @const_decl)
+	  (var_spec name: (identifier) @var_decl)
+	  (field_declaration name: (field_identifier) @field_decl)
+	  (method_elem name: (field_identifier) @iface_method_decl)
+	  (import_spec path: (interpreted_string_literal) @import_path)
+
+	  ;; === Usages ===
+	  (call_expression function: (identifier) @func_usage)
+	  (call_expression function: (selector_expression field: (field_identifier) @method_usage))
+	  (selector_expression field: (field_identifier) @field_usage)
+	  (identifier) @var_usage
+	]
 	`
 
 	q, err := sitter.NewQuery(gp.language, queryText)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create query: %w", err)
+		return nil, err
 	}
 	defer q.Close()
 
 	qc := sitter.NewQueryCursor()
-	matches := qc.Matches(q, tree.RootNode(), src)
+	matches := qc.Matches(q, tree.RootNode(), content)
 
-	processedLines := make(map[int]bool) // Avoid duplicate context for same line
+	var symbols []types.Symbol
 
 	for {
 		m := matches.Next()
 		if m == nil {
 			break
 		}
-
 		for _, c := range m.Captures {
-			node := c.Node
-			nodeText := strings.TrimSpace(node.Utf8Text(src))
-
-			if nodeText == symbolName {
-				lineNum := int(node.StartPosition().Row) + 1
-
-				if processedLines[lineNum] {
-					continue
-				}
-
-				if gp.isSymbolUsage(&node, src, symbolName) {
-					context := gp.extractUsageContext(src, &node, symbolName)
-					if context != "" {
-						usages = append(usages, types.SymbolUsage{
-							SymbolName: symbolName,
-							FilePath:   filePath,
-							LineNumber: lineNum,
-							Context:    context,
-						})
-						processedLines[lineNum] = true
-					}
-				}
+			name := strings.TrimSpace(c.Node.Utf8Text(content))
+			if name == "" {
+				continue
 			}
+
+			startLine := int(c.Node.StartPosition().Row) + 1
+			endLine := int(c.Node.EndPosition().Row) + 1
+			captureName := q.CaptureNames()[c.Index]
+
+			symbols = append(symbols, types.Symbol{
+				Name:      name,
+				Type:      captureName,
+				Package:   packageName,
+				FilePath:  filePath,
+				StartLine: startLine,
+				EndLine:   endLine,
+			})
 		}
 	}
 
-	return usages, nil
+	return symbols, nil
 }
 
-// isSymbolUsage determines if an AST node represents a symbol usage (not definition)
-func (gp *GoParser) isSymbolUsage(node *sitter.Node, src []byte, symbolName string) bool {
-	parent := node.Parent()
-	if parent == nil {
-		return false
-	}
-
-	parentKind := parent.Kind()
-
-	// Skip if this is part of a function/method/type definition
-	switch parentKind {
-	case "function_declaration", "method_declaration", "type_declaration", "type_spec":
-		return false
-	case "field_declaration", "parameter_declaration", "var_declaration", "const_declaration":
-		return false
-	}
-
-	// Check if parent is a function/method declaration by walking up
-	current := parent
-	for current != nil {
-		kind := current.Kind()
-		if kind == "function_declaration" || kind == "method_declaration" {
-			// Check if our node is the function name (definition)
-			nameNode := current.ChildByFieldName("name")
-			if nameNode != nil && nameNode.StartByte() == node.StartByte() && nameNode.EndByte() == node.EndByte() {
-				return false
-			}
-			break
-		}
-		current = current.Parent()
-	}
-
-	return true
-}
+// TODO review code after this line
 
 // extractUsageContext extracts semantic context around a symbol usage
 func (gp *GoParser) extractUsageContext(src []byte, node *sitter.Node, symbolName string) string {
@@ -274,7 +247,7 @@ func (gp *GoParser) extractLineContext(src []byte, node *sitter.Node, symbolName
 	return builder.String()
 }
 
-func (gp *GoParser) GetSymbolContext(filePath, content string, symbol types.Symbol) (string, error) {
+func (gp *GoParser) GetSymbolContext(filePath string, symbol types.Symbol, content []byte) (string, error) {
 	// Parse the file to get AST
 	src := []byte(content)
 	tree := gp.parser.Parse(src, nil)
@@ -319,89 +292,6 @@ func (gp *GoParser) findNodeAtLocation(root *sitter.Node, src []byte, targetLine
 	}
 
 	return findNode(root)
-}
-
-func (gp *GoParser) SupportedExtensions() []string {
-	return []string{`.go`}
-}
-
-func (gp *GoParser) ParseFile(filePath, content string) ([]types.Symbol, error) {
-	src := []byte(content)
-	tree := gp.parser.Parse(src, nil)
-	if tree == nil {
-		return nil, fmt.Errorf("failed to parse Go file: tree-sitter returned nil")
-	}
-	defer tree.Close()
-
-	packageName := gp.extractPackageName(tree.RootNode(), src)
-
-	queryText := `
-	(source_file
-		(function_declaration) @decl)
-	(source_file
-		(method_declaration) @decl)
-	(source_file
-		(type_declaration (type_spec) @decl))
-	(source_file
-		(const_declaration (const_spec) @decl))
-	(source_file
-		(var_declaration (var_spec) @decl))
-	(source_file
-		(var_declaration (var_spec_list (var_spec) @decl)))
-	(source_file
-		(import_declaration (import_spec) @decl))
-	(source_file
-		(import_declaration (import_spec_list (import_spec) @decl)))
-	(source_file
-		(type_declaration (type_spec (struct_type (field_declaration_list (field_declaration) @decl)))))
-	(source_file
-		(type_declaration (type_spec (interface_type (method_elem) @decl))))
-`
-
-	q, err := sitter.NewQuery(gp.language, queryText)
-	if err != nil {
-		return nil, err
-	}
-	defer q.Close()
-
-	qc := sitter.NewQueryCursor()
-	var symbols []types.Symbol
-
-	matches := qc.Matches(q, tree.RootNode(), src)
-
-	for {
-		m := matches.Next()
-		if m == nil {
-			break
-		}
-		for _, c := range m.Captures {
-			declNode := c.Node
-			nameNodes := findNameNodes(&declNode)
-			if len(nameNodes) == 0 {
-				continue
-			}
-
-			startLine := int(declNode.StartPosition().Row) + 1
-			endLine := int(declNode.EndPosition().Row) + 1
-
-			for _, nameNode := range nameNodes {
-				name := strings.TrimSpace(nameNode.Utf8Text(src))
-				if name == "" {
-					continue
-				}
-
-				symbols = append(symbols, types.Symbol{
-					Name:      name,
-					Package:   packageName,
-					FilePath:  filePath,
-					StartLine: startLine,
-					EndLine:   endLine,
-				})
-			}
-		}
-	}
-
-	return symbols, nil
 }
 
 func findNameNodes(node *sitter.Node) []*sitter.Node {

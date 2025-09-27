@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -32,14 +33,120 @@ func NewCodeReviewAgent(provider llm.Provider, registry *tools.Registry, cfg *co
 	}
 }
 
+func (a *CodeReviewAgent) ReviewStagedChanges() error {
+	fmt.Println("Starting code review on staged changes...")
+	return a.executeReview()
+}
 
+func (a *CodeReviewAgent) executeReview() error {
+	diffTool := a.toolRegistry.Get(tools.ToolNameGitDiff)
 
-// GenerateReview generates the review and returns the raw LLM response
+	diffResult, err := diffTool.Execute(map[string]any{})
+	if err != nil {
+		return fmt.Errorf("failed to get staged diff list: %w", err)
+	}
+	diffMap, ok := diffResult.(map[string]types.DiffData)
+	if !ok {
+		return fmt.Errorf("diff tool returned unexpected type: %T", diffResult)
+	}
+
+	changedFilesPaths := make([]string, 0, len(diffMap))
+	for fileName := range diffMap {
+		changedFilesPaths = append(changedFilesPaths, fileName)
+	}
+
+	fmt.Print("Files to be reviewed:")
+	if len(changedFilesPaths) == 0 {
+		fmt.Println("   - no staged changes found - use 'git add' to stage files for review")
+		return nil
+	}
+
+	for _, file := range changedFilesPaths {
+		fmt.Printf("\n   + %s", file)
+	}
+
+	primaryLanguage, err := a.ValidateAndDetectLanguage(changedFilesPaths)
+	if err != nil {
+		return err
+	}
+
+	return a.ReviewChanges(diffMap, primaryLanguage)
+}
+
+func (a *CodeReviewAgent) ValidateAndDetectLanguage(changedFiles []string) (string, error) {
+	var primaryLanguage string
+
+	for _, filePath := range changedFiles {
+		parser := a.parserRegistry.GetParser(filePath)
+		if parser != nil {
+			lang := strings.ToLower(parser.Language())
+
+			if primaryLanguage == "" {
+				primaryLanguage = lang
+			} else if primaryLanguage != lang {
+				return "", fmt.Errorf("multi-language changes detected: %v and %v. Currently only single-language diffs are supported", primaryLanguage, lang)
+			}
+		} else if a.parserRegistry.IsKnownLanguage(filePath) {
+			return "", fmt.Errorf("unsupported language file: %s. No parser available for this file type", filePath)
+		}
+	}
+
+	return primaryLanguage, nil
+}
+func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, primaryLanguage string) error {
+	_, err := a.ReviewChangesWithResult(diffMap, primaryLanguage, true)
+	return err
+}
+
+func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffData, primaryLanguage string, printResults bool) (string, error) {
+	err := a.UpdateDiffContext(diffMap, primaryLanguage)
+	if err != nil {
+		return "", fmt.Errorf("context gathering failed: %w", err)
+	}
+
+	// Step 3: Generate review using the same process as the main app
+	review, err := a.GenerateReview(reviewContext)
+	if err != nil {
+		return "", fmt.Errorf("generate review failed: %w", err)
+	}
+
+	// Step 4: Optionally process and print results (for CLI usage)
+	if printResults {
+		err = a.ProcessAndPrintReview(review)
+		if err != nil {
+			return review, fmt.Errorf("failed to process review: %w", err)
+		}
+	}
+
+	return review, nil
+}
+
+func (a *CodeReviewAgent) UpdateDiffContext(diffMap map[string]types.DiffData, primaryLanguage string) error {
+	symbolContextTool := a.toolRegistry.Get(tools.ToolNameSymbolContext)
+	for _, diffData := range diffMap {
+		updatedDataResult, err := symbolContextTool.Execute(map[string]any{"diffData": diffData, "primaryLanguage": primaryLanguage})
+		if err != nil {
+			return fmt.Errorf("symbol analysis failed: %w", err)
+		}
+		updatedData, ok := updatedDataResult.(types.DiffData)
+		if !ok {
+			return fmt.Errorf("symbol context tool returned unexpected type: %T", updatedDataResult)
+		}
+
+		diffData.DiffContext = updatedData.DiffContext
+	}
+
+	return nil
+}
+
+// TODO reveiw code below this line
+
 func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) (string, error) {
 	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, context)
 	if err != nil {
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}
+	fmt.Println(prompt)
 
 	spinner := spinner.New("Analyzing changes...")
 	spinner.Start()
@@ -54,7 +161,6 @@ func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) (string, 
 	return review, nil
 }
 
-// ProcessAndPrintReview processes the LLM response and prints the results
 func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {
 	issues, err := utils.ParseIssuesFromResponse(review)
 	if err != nil {
@@ -82,122 +188,93 @@ func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {
 	return nil
 }
 
-func (a *CodeReviewAgent) ReviewStagedChanges() error {
-	fmt.Println("Starting code review on staged changes...")
-	return a.executeReview()
+func (a *CodeReviewAgent) ReviewBranch(branchName string) error {
+	fmt.Printf("Starting code review on branch: %s\n", branchName)
+	return a.executeBranchReview(branchName)
 }
 
-// ReviewChanges performs code review on provided diff and file contents
-func (a *CodeReviewAgent) ReviewChanges(diff string, fileContents map[string]string, changedFiles []string) error {
-	_, err := a.ReviewChangesWithResult(diff, fileContents, changedFiles, true)
-	return err
-}
+func (a *CodeReviewAgent) executeBranchReview(branchName string) error {
+	// Step 1: Verify we're in a Git repository for symbol context
+	if err := a.verifyGitRepository(); err != nil {
+		return fmt.Errorf("branch review requires running from a Git repository: %w", err)
+	}
 
-// ReviewChangesWithResult performs code review and optionally returns the result
-func (a *CodeReviewAgent) ReviewChangesWithResult(diff string, fileContents map[string]string, changedFiles []string, printResults bool) (string, error) {
-	// Step 1: Validate language support and detect primary language
-	primaryLanguage, err := a.ValidateAndDetectLanguage(changedFiles)
+	// Step 2: Fetch branch and get diff
+	branchFetchTool := a.toolRegistry.Get(tools.ToolNameBranchFetch)
+
+	diff, err := branchFetchTool.Execute(map[string]any{"branch_name": branchName})
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to fetch branch data: %w", err)
 	}
 
-	// Step 2: Enhanced context gathering with symbol analysis
-	reviewContext, err := a.GatherEnhancedContextWithFiles(diff, changedFiles, primaryLanguage, fileContents)
-	if err != nil {
-		return "", fmt.Errorf("context gathering failed: %w", err)
-	}
+	// Step 3: Extract changed files from diff
+	changedFiles := a.extractFilesFromDiff(diff)
 
-	// Step 3: Generate review using the same process as the main app
-	review, err := a.GenerateReview(reviewContext)
-	if err != nil {
-		return "", fmt.Errorf("generate review failed: %w", err)
-	}
-
-	// Step 4: Optionally process and print results (for CLI usage)
-	if printResults {
-		err = a.ProcessAndPrintReview(review)
-		if err != nil {
-			return review, fmt.Errorf("failed to process review: %w", err)
-		}
-	}
-
-	return review, nil
-}
-
-func (a *CodeReviewAgent) executeReview() error {
-	// Step 1: Get staged files
-	stagedFilesTool := a.toolRegistry.Get(tools.ToolNameGitStagedFiles)
-
-	stagedFilesOutput, err := stagedFilesTool.Execute(map[string]any{})
-	if err != nil {
-		return fmt.Errorf("failed to get staged files: %w", err)
-	}
-
-	changedFiles := utils.ParseStagedFiles(stagedFilesOutput)
+	fmt.Printf("Branch Review: %s\n", branchName)
 
 	fmt.Print("Files to be reviewed:")
 	if len(changedFiles) == 0 {
-		fmt.Println("   ✕ no staged changes found - use 'git add' to stage files for review")
+		fmt.Println("   ✕ no changed files found in branch")
 		return nil
 	}
 
 	for _, file := range changedFiles {
 		fmt.Printf("\n   ✓ %s", file)
 	}
-
-	// Step 2: Get diff for analysis
-	diffTool := a.toolRegistry.Get(tools.ToolNameGitDiff)
-
-	diff, err := diffTool.Execute(map[string]any{})
-	if err != nil {
-		return fmt.Errorf("failed to get staged diff: %w", err)
-	}
-
-	// Step 3: Read file contents
-	fileContents, err := a.readFileContents(changedFiles)
-	if err != nil {
-		return err
-	}
+	fmt.Println()
 
 	// Step 4: Use the core review logic
-	return a.ReviewChanges(diff, fileContents, changedFiles)
+	return a.ReviewChanges(diff, changedFiles)
 }
 
-func (a *CodeReviewAgent) GatherEnhancedContext(diff string, changedFiles []string, primaryLanguage string) (*types.ReviewContext, error) {
-	return a.GatherEnhancedContextWithFiles(diff, changedFiles, primaryLanguage, nil)
+func (a *CodeReviewAgent) verifyGitRepository() error {
+	if _, err := os.Stat(".git"); os.IsNotExist(err) {
+		return fmt.Errorf("not a Git repository (no .git directory found)")
+	}
+	return nil
 }
 
-func (a *CodeReviewAgent) GatherEnhancedContextWithFiles(diff string, changedFiles []string, primaryLanguage string, preloadedFiles map[string]string) (*types.ReviewContext, error) {
-	var fileContents map[string]string
-	var err error
+func (a *CodeReviewAgent) readLocalFileContents(files []string) (map[string]string, error) {
+	fileContents := make(map[string]string)
+	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
 
-	if preloadedFiles != nil {
-		fileContents = preloadedFiles
-	} else {
-		fileContents, err = a.readFileContents(changedFiles)
+	for _, file := range files {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			continue
+		}
+
+		content, err := readTool.Execute(map[string]any{"filename": file})
 		if err != nil {
-			return nil, err
+			fmt.Printf("Warning: Could not read local file %s: %v\n", file, err)
+			continue
+		}
+
+		absPath, err := filepath.Abs(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get absolute path for %s: %w", file, err)
+		}
+
+		fileContents[absPath] = content
+	}
+
+	return fileContents, nil
+}
+
+func (a *CodeReviewAgent) extractFilesFromDiff(diff string) []string {
+	var files []string
+	lines := strings.SplitSeq(diff, "\n")
+
+	for line := range lines {
+		if strings.HasPrefix(line, "diff --git") {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				filename := strings.TrimPrefix(parts[3], "b/")
+				files = append(files, filename)
+			}
 		}
 	}
 
-	context := &types.ReviewContext{
-		Diff:         diff,
-		ChangedFiles: changedFiles,
-		FileContents: fileContents,
-	}
-
-	symbolContextTool := a.toolRegistry.Get(tools.ToolNameSymbolContext)
-	symbolAnalysis, err := symbolContextTool.Execute(map[string]any{
-		"diff":             diff,
-		"file_contents":    context.FileContents,
-		"primary_language": primaryLanguage,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("symbol analysis failed: %w", err)
-	}
-	context.SymbolAnalysis = symbolAnalysis
-
-	return context, nil
+	return files
 }
 
 func (a *CodeReviewAgent) readFileContents(files []string) (map[string]string, error) {
@@ -236,28 +313,4 @@ func (a *CodeReviewAgent) PrintContextSummary(context *types.ReviewContext) {
 	} else {
 		fmt.Println("\n   ✕ No additional context found")
 	}
-}
-
-
-
-// ValidateAndDetectLanguage checks if all programming language files are supported and returns the primary language
-func (a *CodeReviewAgent) ValidateAndDetectLanguage(changedFiles []string) (string, error) {
-	var primaryLanguage string
-
-	for _, filePath := range changedFiles {
-		parser := a.parserRegistry.GetParser(filePath)
-		if parser != nil {
-			lang := strings.ToLower(parser.Language())
-
-			if primaryLanguage == "" {
-				primaryLanguage = lang
-			} else if primaryLanguage != lang {
-				return "", fmt.Errorf("multi-language changes detected: %v and %v. Currently only single-language diffs are supported", primaryLanguage, lang)
-			}
-		} else if a.parserRegistry.IsKnownLanguage(filePath) {
-			return "", fmt.Errorf("unsupported language file: %s. No parser available for this file type", filePath)
-		}
-	}
-
-	return primaryLanguage, nil
 }

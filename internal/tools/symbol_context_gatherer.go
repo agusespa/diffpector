@@ -11,47 +11,43 @@ import (
 )
 
 type SymbolContextGatherer struct {
-	registry *ParserRegistry
+	parserRegistry *ParserRegistry
 }
 
 func NewSymbolContextGatherer(registry *ParserRegistry) *SymbolContextGatherer {
 	return &SymbolContextGatherer{
-		registry: registry,
+		parserRegistry: registry,
 	}
 }
 
-// GatherSymbolContext finds definitions and usages of affected symbols across the codebase
-func (g *SymbolContextGatherer) GatherSymbolContext(affectedSymbols []types.Symbol, projectRoot, primaryLanguage string) (string, error) {
+func (g *SymbolContextGatherer) GatherSymbolContext(affectedSymbols []types.SymbolUsage, projectRoot, primaryLanguage string) error {
 	if len(affectedSymbols) == 0 {
-		return "", nil
+		return nil
 	}
 
 	var contextBuilder strings.Builder
 
-	for _, symbol := range affectedSymbols {
-		context, err := g.findSymbolDefinitions(symbol, projectRoot, primaryLanguage)
+	for _, symbolUsage := range affectedSymbols {
+		context, err := g.addSymbolContexts(symbolUsage.Symbol, projectRoot, primaryLanguage)
 		if err != nil {
-			// Log but don't fail the whole process
 			continue
 		}
 
 		if context != "" {
-			contextBuilder.WriteString(fmt.Sprintf("=== Symbol: %s (Package: %s) ===\n", symbol.Name, symbol.Package))
+			contextBuilder.WriteString(fmt.Sprintf("=== Symbol: %s (Package: %s) ===\n", symbolUsage.Symbol.Name, symbolUsage.Symbol.Package))
 			contextBuilder.WriteString(context)
 			contextBuilder.WriteString("\n")
 		}
 	}
 
-	return contextBuilder.String(), nil
+	return nil
 }
 
-// findSymbolDefinitions uses grep to find candidate files, then AST parsing for accuracy
-func (g *SymbolContextGatherer) findSymbolDefinitions(symbol types.Symbol, projectRoot, primaryLanguage string) (string, error) {
+func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRoot, primaryLanguage string) (string, error) {
 	candidateFiles, err := g.findCandidateFiles(symbol, projectRoot, primaryLanguage)
 	if err != nil {
 		return "", fmt.Errorf("failed to find candidate files for symbol %s: %w", symbol.Name, err)
 	}
-
 	if len(candidateFiles) == 0 {
 		return "", nil
 	}
@@ -59,51 +55,33 @@ func (g *SymbolContextGatherer) findSymbolDefinitions(symbol types.Symbol, proje
 	var contextBuilder strings.Builder
 
 	for _, filePath := range candidateFiles {
-
-		content, err := os.ReadFile(filePath)
+		content, err := os.ReadFile(filepath.Join(filePath))
 		if err != nil {
 			continue
 		}
 
-		symbols, err := g.registry.ParseFile(filePath, string(content))
+		symbols, err := g.parserRegistry.ParseFile(filePath, content)
 		if err != nil {
 			continue
 		}
 
-		isOriginalFile := g.isSameFile(filePath, symbol.FilePath, projectRoot)
-
-		// Look for symbol definitions with the same name
-		for _, foundSymbol := range symbols {
-			if foundSymbol.Name == symbol.Name {
-				// Skip showing the exact same symbol definition from the original file
-				// (to avoid showing the modified symbol's own definition)
-				if isOriginalFile && foundSymbol.StartLine == symbol.StartLine && foundSymbol.EndLine == symbol.EndLine {
-					continue
-				}
-
-				// Use the language parser to extract context for definitions
-				parser := g.registry.GetParser(filePath)
-				if parser != nil {
-					context, err := parser.GetSymbolContext(filePath, string(content), foundSymbol)
-					if err == nil && context != "" {
-						contextBuilder.WriteString(fmt.Sprintf("Definition in: %s\n", filePath))
-						contextBuilder.WriteString(context)
-						contextBuilder.WriteString("\n")
-					}
-				}
+		for _, s := range symbols {
+			if s.Name != symbol.Name || s.Package != symbol.Package {
+				continue
 			}
-		}
 
-		// Look for symbol usages using the language parser
-		parser := g.registry.GetParser(filePath)
-		if parser != nil {
-			usages, err := parser.FindSymbolUsages(filePath, string(content), symbol.Name)
-			if err == nil {
-				for _, usage := range usages {
-					contextBuilder.WriteString(fmt.Sprintf("Found in: %s\n", filePath))
-					contextBuilder.WriteString(usage.Context)
-					contextBuilder.WriteString("\n")
-				}
+			snippet := extractSnippet(content, s.StartLine, s.EndLine)
+
+			if strings.HasSuffix(s.Type, "_decl") {
+				contextBuilder.WriteString(fmt.Sprintf("Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
+				contextBuilder.WriteString(snippet)
+				contextBuilder.WriteString("\n\n")
+			}
+
+			if strings.HasSuffix(s.Type, "_usage") {
+				contextBuilder.WriteString(fmt.Sprintf("Usage in %s (line %d):\n", filePath, s.StartLine))
+				contextBuilder.WriteString(snippet)
+				contextBuilder.WriteString("\n\n")
 			}
 		}
 	}
@@ -111,29 +89,6 @@ func (g *SymbolContextGatherer) findSymbolDefinitions(symbol types.Symbol, proje
 	return contextBuilder.String(), nil
 }
 
-// isSameFile checks if two file paths refer to the same file, handling relative vs absolute paths
-func (g *SymbolContextGatherer) isSameFile(candidateFile, symbolFile, projectRoot string) bool {
-	// Direct comparison first
-	if candidateFile == symbolFile {
-		return true
-	}
-
-	// Convert symbol file to absolute path if it's relative
-	var symbolAbsPath string
-	if filepath.IsAbs(symbolFile) {
-		symbolAbsPath = symbolFile
-	} else {
-		symbolAbsPath = filepath.Join(projectRoot, symbolFile)
-	}
-
-	// Clean both paths to handle any . or .. components
-	candidateClean := filepath.Clean(candidateFile)
-	symbolClean := filepath.Clean(symbolAbsPath)
-
-	return candidateClean == symbolClean
-}
-
-// findCandidateFiles uses git grep to find files that might contain the symbol
 func (g *SymbolContextGatherer) findCandidateFiles(symbol types.Symbol, projectRoot, primaryLanguage string) ([]string, error) {
 	files, err := g.gitGrepSearch(symbol.Name, projectRoot, primaryLanguage)
 	if err != nil {
@@ -144,24 +99,18 @@ func (g *SymbolContextGatherer) findCandidateFiles(symbol types.Symbol, projectR
 }
 
 func (g *SymbolContextGatherer) gitGrepSearch(pattern, projectRoot, primaryLanguage string) ([]string, error) {
-	// Get language-specific include patterns
 	includePatterns := g.getIncludePatterns(primaryLanguage)
 
-	// Build git grep command with pathspec patterns
 	args := []string{"grep", "-l", pattern}
-
-	// Add pathspec patterns (git grep uses -- to separate patterns from paths)
 	if len(includePatterns) > 0 {
 		args = append(args, "--")
 		args = append(args, includePatterns...)
 	}
 
-	// Use git grep to find files containing the pattern
 	cmd := exec.Command("git", args...)
-	cmd.Dir = projectRoot // Set working directory
+	cmd.Dir = projectRoot
 	output, err := cmd.Output()
 	if err != nil {
-		// If git grep finds no matches, it returns exit code 1, which is not an error for us
 		if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
 			return []string{}, nil
 		}
@@ -195,26 +144,14 @@ func (g *SymbolContextGatherer) validateFiles(files []string, projectRoot string
 			}
 		}
 
-		// Use language-specific filtering to reduce noise (pass relative path)
-		parser := g.registry.GetParser(relPath)
+		parser := g.parserRegistry.GetParser(relPath)
 		if parser != nil && parser.ShouldExcludeFile(relPath, projectRoot) {
 			continue
 		}
-		
-		// Fallback: exclude obvious test files even if no parser found
-		if strings.HasSuffix(relPath, "_test.go") {
-			continue
-		}
 
-		// Convert to absolute path for final result (needed by other parts of the system)
 		absPath := file
 		if !filepath.IsAbs(file) {
 			absPath = filepath.Join(projectRoot, file)
-		}
-
-		// Check if file exists and is readable
-		if _, err := os.Stat(absPath); err != nil {
-			continue
 		}
 
 		validFiles = append(validFiles, absPath)
@@ -223,7 +160,6 @@ func (g *SymbolContextGatherer) validateFiles(files []string, projectRoot string
 	return validFiles
 }
 
-// getIncludePatterns returns file patterns to search for a given language
 func (g *SymbolContextGatherer) getIncludePatterns(language string) []string {
 	commonConfigs := []string{
 		"*.json", "*.yaml", "*.yml", "*.toml", "*.xml",
@@ -264,4 +200,28 @@ func (g *SymbolContextGatherer) getLanguageSpecificPatterns(language string) []s
 	}
 
 	return []string{} // Return empty for unknown languages
+}
+
+func extractSnippet(content []byte, start, end int) string {
+	lines := strings.Split(string(content), "\n")
+
+	// include 2 lines before and after the symbol for context
+	lo := max(0, start-3) // Tree-sitter positions are 1-based here
+	hi := min(len(lines), end+2)
+
+	return strings.Join(lines[lo:hi], "\n")
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

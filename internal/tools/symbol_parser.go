@@ -2,6 +2,8 @@ package tools
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -10,13 +12,10 @@ import (
 
 type LanguageParser interface {
 	// ParseFile extracts all symbols (functions, types, variables, etc.) from a file
-	ParseFile(filePath, content string) ([]types.Symbol, error)
-
-	// FindSymbolUsages finds all usages of a specific symbol within a file
-	FindSymbolUsages(filePath, content, symbolName string) ([]types.SymbolUsage, error)
+	ParseFile(filePath string, content []byte) ([]types.Symbol, error)
 
 	// GetSymbolContext extracts contextual information around a symbol definition
-	GetSymbolContext(filePath, content string, symbol types.Symbol) (string, error)
+	GetSymbolContext(filePath string, symbol types.Symbol, content []byte) (string, error)
 
 	// SupportedExtensions returns the file extensions this parser can handle
 	SupportedExtensions() []string
@@ -44,29 +43,29 @@ func NewParserRegistry() *ParserRegistry {
 	}
 	registry.RegisterParser(goParser)
 
-	tsParser, err := NewTypeScriptParser()
-	if err != nil {
-		panic(fmt.Errorf("failed to create TypeScript parser: %w", err))
-	}
-	registry.RegisterParser(tsParser)
+	// tsParser, err := NewTypeScriptParser()
+	// if err != nil {
+	// 	panic(fmt.Errorf("failed to create TypeScript parser: %w", err))
+	// }
+	// registry.RegisterParser(tsParser)
 
-	javaParser, err := NewJavaParser()
-	if err != nil {
-		panic(fmt.Errorf("failed to create Java parser: %w", err))
-	}
-	registry.RegisterParser(javaParser)
+	// javaParser, err := NewJavaParser()
+	// if err != nil {
+	// 	panic(fmt.Errorf("failed to create Java parser: %w", err))
+	// }
+	// registry.RegisterParser(javaParser)
 
-	pythonParser, err := NewPythonParser()
-	if err != nil {
-		panic(fmt.Errorf("failed to create Python parser: %w", err))
-	}
-	registry.RegisterParser(pythonParser)
+	// pythonParser, err := NewPythonParser()
+	// if err != nil {
+	// 	panic(fmt.Errorf("failed to create Python parser: %w", err))
+	// }
+	// registry.RegisterParser(pythonParser)
 
-	cParser, err := NewCParser()
-	if err != nil {
-		panic(fmt.Errorf("failed to create C parser: %w", err))
-	}
-	registry.RegisterParser(cParser)
+	// cParser, err := NewCParser()
+	// if err != nil {
+	// 	panic(fmt.Errorf("failed to create C parser: %w", err))
+	// }
+	// registry.RegisterParser(cParser)
 
 	return registry
 }
@@ -77,31 +76,33 @@ func (pr *ParserRegistry) RegisterParser(parser LanguageParser) {
 	}
 }
 
-func (pr *ParserRegistry) GetParser(filePath string) LanguageParser {
-	ext := strings.ToLower(filepath.Ext(filePath))
-	return pr.parsers[ext]
-}
-
-func (pr *ParserRegistry) ParseFile(filePath, content string) ([]types.Symbol, error) {
+func (pr *ParserRegistry) ParseFile(filePath string, content []byte) ([]types.Symbol, error) {
 	parser := pr.GetParser(filePath)
 	if parser == nil {
 		return []types.Symbol{}, nil
 	}
+
 	return parser.ParseFile(filePath, content)
 }
 
-func (pr *ParserRegistry) ParseChangedFiles(fileContents map[string]string) ([]types.Symbol, error) {
-	var allSymbols []types.Symbol
-
-	for filePath, content := range fileContents {
-		symbols, err := pr.ParseFile(filePath, content)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse file %s: %w", filePath, err)
-		}
-		allSymbols = append(allSymbols, symbols...)
+// TODO is this used?
+func (pr *ParserRegistry) GetSymbolContext(filePath string, symbol types.Symbol) (string, error) {
+	parser := pr.GetParser(filePath)
+	if parser == nil {
+		return "", nil
 	}
 
-	return allSymbols, nil
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Fatalf("Failed to read file: %v", err)
+	}
+
+	return parser.GetSymbolContext(filePath, symbol, content)
+}
+
+func (pr *ParserRegistry) GetParser(filePath string) LanguageParser {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	return pr.parsers[ext]
 }
 
 func (pr *ParserRegistry) IsKnownLanguage(filePath string) bool {

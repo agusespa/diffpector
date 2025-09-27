@@ -5,23 +5,23 @@ import (
 	"slices"
 )
 
-var ProblematicModels = []string{
+var UnsuitableModels = []string{
 	"codellama:13b",
-	"codestral", 
+	"codestral",
 	"qwen3:14b",
 }
 
 var ApprovedModels = []string{
 	"qwen2.5-coder:14b",
 	"qwen2.5-coder:7b",
-	"codegemma:7b", 
+	"codegemma:7b",
 	"llama3.1:8b",
 	"gpt-oss:20b",
 	"codestral:22b",
 }
 
 func ValidateModel(model string) error {
-	if slices.Contains(ProblematicModels, model) {
+	if slices.Contains(UnsuitableModels, model) {
 		return fmt.Errorf("model '%s' has known issues and cannot be used", model)
 	}
 	return nil
@@ -29,6 +29,6 @@ func ValidateModel(model string) error {
 
 func WarnIfUnapproved(model string) {
 	if !slices.Contains(ApprovedModels, model) {
-		fmt.Printf("Warning: Model '%s' is not tested. You may experience unexpected results.\n\n", model)
+		fmt.Printf("Warning: Model '%s' is not tested - you may experience unexpected results.\n\n", model)
 	}
 }

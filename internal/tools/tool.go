@@ -3,9 +3,9 @@ package tools
 import "fmt"
 
 type Tool interface {
-	Execute(args map[string]any) (string, error)
-	Description() string
 	Name() string
+	Description() string
+	Execute(args map[string]any) (any, error)
 }
 
 type ToolName string
@@ -18,6 +18,7 @@ const (
 	ToolNameWriteFile      ToolName = "write_file"
 	ToolNameGitGrep        ToolName = "git_grep"
 	ToolNameAppendFile     ToolName = "append_file"
+	ToolNameBranchFetch    ToolName = "branch_fetch"
 )
 
 type Registry struct {
