@@ -1,0 +1,27 @@
+#!/bin/sh
+
+echo "> Running pre-push hook..."
+
+set -e
+
+echo ">> Running security audit..."
+govulncheck ./... > /dev/null 2>&1 || { echo "ERROR: Security audit failed"; exit 1; }
+
+echo ">> Running dependency check..."
+go mod verify > /dev/null 2>&1 || { echo "ERROR: Module verification failed"; exit 1; }
+go mod tidy > /dev/null 2>&1
+
+echo ">> Running linter..."
+golangci-lint run > /dev/null 2>&1 || { echo "ERROR: Lint failed"; exit 1; }
+
+echo ">> Running tests..."
+go test ./... > /dev/null 2>&1 || { echo "ERROR: Tests failed"; exit 1; }
+
+echo ">> Running tests with race detection..."
+go test -race ./... > /dev/null 2>&1 || { echo "ERROR: Race detection tests failed"; exit 1; }
+
+echo ">> Running type check and build..."
+go build -o /dev/null ./... > /dev/null 2>&1 || { echo "ERROR: Build failed"; exit 1; }
+
+echo "✅ All checks passed!"
+exit 0

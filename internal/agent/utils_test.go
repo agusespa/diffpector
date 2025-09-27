@@ -45,12 +45,14 @@ func TestNotifyUserIfReportNotIgnored(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_ = os.Remove(reportFilename)
+			_ = os.Remove(gitignoreFilename)
+
 			if tt.reportFileExists {
 				_, err := os.Create(reportFilename)
 				if err != nil {
 					t.Fatalf("Failed to create report file: %v", err)
 				}
-				defer os.Remove(reportFilename)
 			}
 
 			if tt.gitignoreExists {
@@ -58,10 +60,6 @@ func TestNotifyUserIfReportNotIgnored(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create gitignore file: %v", err)
 				}
-				defer os.Remove(gitignoreFilename)
-			} else {
-				// In case it exists from a previous failed run
-				os.Remove(gitignoreFilename)
 			}
 
 			err := NotifyUserIfReportNotIgnored(gitignoreFilename)
@@ -74,6 +72,10 @@ func TestNotifyUserIfReportNotIgnored(t *testing.T) {
 			if gotError != tt.expectedError {
 				t.Errorf("Expected error '%s', but got '%s'", tt.expectedError, gotError)
 			}
+
+			// Clean up the files after the test
+			_ = os.Remove(reportFilename)
+			_ = os.Remove(gitignoreFilename)
 		})
 	}
 }

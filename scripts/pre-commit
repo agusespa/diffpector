@@ -1,0 +1,46 @@
+#!/bin/sh
+
+echo "> Running pre-commit hook..."
+
+set -e
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.go' ':!vendor' ':!.git')
+
+if [ -n "$staged_files" ]; then
+    echo ">> Running gofmt on staged Go files..."
+    echo "$staged_files" | xargs gofmt -w > /dev/null 2>&1
+
+    echo ">> Running goimports on staged Go files..."
+    echo "$staged_files" | xargs goimports -w > /dev/null 2>&1
+    echo "$staged_files" | xargs git add
+
+    echo ">> Running golangci-lint..."
+    golangci-lint run > /dev/null 2>&1 || {
+	echo "ERROR: golangci-lint failed"
+        exit 1
+    }
+    
+    test_packages=""
+    for file in $staged_files; do
+        package_dir=$(dirname "$file")
+        
+        if ls "$package_dir"/*_test.go >/dev/null 2>&1; then
+            if ! echo "$test_packages" | grep -q "$package_dir"; then
+                test_packages="$test_packages ./$package_dir"
+            fi
+        fi
+    done
+    
+    if [ -n "$test_packages" ]; then
+        echo ">> Running tests for affected packages..."
+        go test $test_packages > /dev/null 2>&1 || {
+            echo "ERROR: Tests failed"
+            exit 1
+        }
+    else
+        echo ">> WARNING: No test files found for modified packages, skipping tests."
+    fi
+fi
+    
+echo ">> Pre-commit checks passed!"
+exit 0
