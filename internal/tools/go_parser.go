@@ -74,24 +74,24 @@ func (gp *GoParser) ParseFile(filePath string, content []byte) ([]types.Symbol, 
 	packageName := gp.extractPackageName(tree.RootNode(), content)
 
 	queryText := `
-	[
-	  ;; === Declarations ===
-	  (function_declaration name: (identifier) @func_decl)
-	  (method_declaration name: (field_identifier) @method_decl)
-	  (type_spec name: (type_identifier) @type_decl)
-	  (const_spec name: (identifier) @const_decl)
-	  (var_spec name: (identifier) @var_decl)
-	  (field_declaration name: (field_identifier) @field_decl)
-	  (method_elem name: (field_identifier) @iface_method_decl)
-	  (import_spec path: (interpreted_string_literal) @import_path)
+[
+  ;; === Declarations (capture entire nodes, not just names) ===
+  (function_declaration) @func_decl
+  (method_declaration) @method_decl
+  (type_spec) @type_decl
+  (const_spec) @const_decl
+  (var_spec) @var_decl
+  (field_declaration) @field_decl
+  (method_elem) @iface_method_decl
+  (import_spec) @import_decl
 
-	  ;; === Usages ===
-	  (call_expression function: (identifier) @func_usage)
-	  (call_expression function: (selector_expression field: (field_identifier) @method_usage))
-	  (selector_expression field: (field_identifier) @field_usage)
-	  (identifier) @var_usage
-	]
-	`
+  ;; === Usages (these can stay as they are) ===
+  (call_expression function: (identifier) @func_usage)
+  (call_expression function: (selector_expression field: (field_identifier) @method_usage))
+  (selector_expression field: (field_identifier) @field_usage)
+  (identifier) @var_usage
+]
+`
 
 	q, err := sitter.NewQuery(gp.language, queryText)
 	if err != nil {
@@ -110,14 +110,23 @@ func (gp *GoParser) ParseFile(filePath string, content []byte) ([]types.Symbol, 
 			break
 		}
 		for _, c := range m.Captures {
-			name := strings.TrimSpace(c.Node.Utf8Text(content))
+			captureName := q.CaptureNames()[c.Index]
+			startLine := int(c.Node.StartPosition().Row) + 1
+			endLine := int(c.Node.EndPosition().Row) + 1
+
+			var name string
+
+			// For declarations, extract the name from the node structure
+			if strings.HasSuffix(captureName, "_decl") {
+				name = extractDeclarationName(c.Node, content, captureName)
+			} else {
+				// For usages, the captured node is already the name
+				name = strings.TrimSpace(c.Node.Utf8Text(content))
+			}
+
 			if name == "" {
 				continue
 			}
-
-			startLine := int(c.Node.StartPosition().Row) + 1
-			endLine := int(c.Node.EndPosition().Row) + 1
-			captureName := q.CaptureNames()[c.Index]
 
 			symbols = append(symbols, types.Symbol{
 				Name:      name,
@@ -133,168 +142,45 @@ func (gp *GoParser) ParseFile(filePath string, content []byte) ([]types.Symbol, 
 	return symbols, nil
 }
 
-// TODO review code after this line
-
-// extractUsageContext extracts semantic context around a symbol usage
-func (gp *GoParser) extractUsageContext(src []byte, node *sitter.Node, symbolName string) string {
-	// Find containing function and extract it entirely
-	if containingFunc := gp.findContainingFunction(node); containingFunc != nil {
-		return gp.formatFunctionContext(src, containingFunc, node, symbolName)
-	}
-
-	// If not in a function, extract smart line context
-	return gp.extractLineContext(src, node, symbolName)
-}
-
-func (gp *GoParser) findContainingFunction(node *sitter.Node) *sitter.Node {
-	current := node
-	for current != nil {
-		kind := current.Kind()
-		if kind == "function_declaration" || kind == "method_declaration" {
-			return current
+func extractDeclarationName(node sitter.Node, content []byte, captureName string) string {
+	switch captureName {
+	case "func_decl":
+		if nameNode := node.ChildByFieldName("name"); nameNode != nil {
+			return nameNode.Utf8Text(content)
 		}
-		current = current.Parent()
-	}
-	return nil
-}
-
-func (gp *GoParser) formatFunctionContext(src []byte, funcNode *sitter.Node, usageNode *sitter.Node, symbolName string) string {
-	var builder strings.Builder
-
-	// Add function signature
-	signature := gp.extractFunctionSignature(src, funcNode)
-	builder.WriteString(fmt.Sprintf("Function: %s\n", signature))
-	builder.WriteString("Context:\n")
-
-	// Add the entire function with usage highlighted
-	funcText := funcNode.Utf8Text(src)
-	lines := strings.Split(funcText, "\n")
-
-	usageLine := int(usageNode.StartPosition().Row - funcNode.StartPosition().Row)
-
-	for i, line := range lines {
-		prefix := "  "
-		if i == usageLine {
-			prefix = "→ " // Highlight the usage line
+	case "method_decl":
+		if nameNode := node.ChildByFieldName("name"); nameNode != nil {
+			return nameNode.Utf8Text(content)
 		}
-		builder.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
-	}
-
-	return builder.String()
-}
-
-func (gp *GoParser) extractFunctionSignature(src []byte, funcNode *sitter.Node) string {
-	// Extract function name
-	nameNode := funcNode.ChildByFieldName("name")
-	if nameNode == nil {
-		return "unknown"
-	}
-
-	name := nameNode.Utf8Text(src)
-
-	// Extract parameters
-	paramsNode := funcNode.ChildByFieldName("parameters")
-	params := ""
-	if paramsNode != nil {
-		params = paramsNode.Utf8Text(src)
-	}
-
-	// Extract return type
-	resultNode := funcNode.ChildByFieldName("result")
-	result := ""
-	if resultNode != nil {
-		result = " " + resultNode.Utf8Text(src)
-	}
-
-	// Check if it's a method (has receiver)
-	receiverNode := funcNode.ChildByFieldName("receiver")
-	if receiverNode != nil {
-		receiver := receiverNode.Utf8Text(src)
-		return fmt.Sprintf("func %s %s%s%s", receiver, name, params, result)
-	}
-
-	return fmt.Sprintf("func %s%s%s", name, params, result)
-}
-
-func (gp *GoParser) extractLineContext(src []byte, node *sitter.Node, symbolName string) string {
-	// Simple line-based context with a few lines before and after
-	lines := strings.Split(string(src), "\n")
-	usageLine := int(node.StartPosition().Row)
-
-	// Simple context: 3 lines before and after
-	contextSize := 3
-	start := usageLine - contextSize
-	if start < 0 {
-		start = 0
-	}
-
-	end := usageLine + contextSize
-	if end >= len(lines) {
-		end = len(lines) - 1
-	}
-
-	var builder strings.Builder
-	builder.WriteString("Context:\n")
-
-	for i := start; i <= end; i++ {
-		prefix := "  "
-		if i == usageLine {
-			prefix = "→ "
+	case "type_decl":
+		if nameNode := node.ChildByFieldName("name"); nameNode != nil {
+			return nameNode.Utf8Text(content)
 		}
-		builder.WriteString(fmt.Sprintf("%s%d: %s\n", prefix, i+1, lines[i]))
-	}
-
-	return builder.String()
-}
-
-func (gp *GoParser) GetSymbolContext(filePath string, symbol types.Symbol, content []byte) (string, error) {
-	// Parse the file to get AST
-	src := []byte(content)
-	tree := gp.parser.Parse(src, nil)
-	if tree == nil {
-		return "", fmt.Errorf("failed to parse Go file: tree-sitter returned nil")
-	}
-	defer tree.Close()
-
-	// Find the symbol at the given location
-	root := tree.RootNode()
-	targetNode := gp.findNodeAtLocation(root, src, symbol.StartLine)
-	if targetNode == nil {
-		return "", fmt.Errorf("could not find symbol at line %d", symbol.StartLine)
-	}
-
-	// Use the same context extraction logic as for usages
-	return gp.extractUsageContext(src, targetNode, symbol.Name), nil
-}
-
-func (gp *GoParser) findNodeAtLocation(root *sitter.Node, src []byte, targetLine int) *sitter.Node {
-	// Simple approach: find any node that contains the target line
-	var findNode func(*sitter.Node) *sitter.Node
-	findNode = func(node *sitter.Node) *sitter.Node {
-		startLine := int(node.StartPosition().Row) + 1
-		endLine := int(node.EndPosition().Row) + 1
-
-		// If this node contains the target line
-		if startLine <= targetLine && targetLine <= endLine {
-			// Check children first (more specific)
-			for i := uint(0); i < node.ChildCount(); i++ {
-				child := node.Child(i)
-				if child != nil {
-					if result := findNode(child); result != nil {
-						return result
-					}
-				}
+	case "const_decl", "var_decl":
+		// These might have multiple names, just get the first one
+		for i := uint(0); i < node.ChildCount(); i++ {
+			child := node.Child(i)
+			if child != nil && (child.Kind() == "identifier" || child.Kind() == "type_identifier") {
+				return child.Utf8Text(content)
 			}
-			// If no child contains it, return this node
-			return node
 		}
-		return nil
+	case "field_decl":
+		nameNodes := findNameNodes(node)
+		if len(nameNodes) > 0 {
+			return nameNodes[0].Utf8Text(content)
+		}
+	case "import_decl":
+		for i := uint(0); i < node.ChildCount(); i++ {
+			child := node.Child(i)
+			if child != nil && (child.Kind() == "interpreted_string_literal" || child.Kind() == "raw_string_literal") {
+				return child.Utf8Text(content)
+			}
+		}
 	}
-
-	return findNode(root)
+	return ""
 }
 
-func findNameNodes(node *sitter.Node) []*sitter.Node {
+func findNameNodes(node sitter.Node) []*sitter.Node {
 	var names []*sitter.Node
 	kind := node.Kind()
 

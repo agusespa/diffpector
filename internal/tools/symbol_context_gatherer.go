@@ -206,7 +206,7 @@ func extractSnippet(content []byte, start, end int) string {
 	lines := strings.Split(string(content), "\n")
 
 	// include 2 lines before and after the symbol for context
-	lo := max(0, start-3) // Tree-sitter positions are 1-based here
+	lo := max(0, start-3)
 	hi := min(len(lines), end+2)
 
 	return strings.Join(lines[lo:hi], "\n")

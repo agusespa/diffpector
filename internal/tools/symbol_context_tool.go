@@ -51,7 +51,7 @@ func (t *SymbolContextTool) Execute(args map[string]any) (types.DiffData, error)
 		return types.DiffData{}, fmt.Errorf("failed to parse changed files: %w", err)
 	}
 
-	diffContext, err := utils.GetDiffContext(diffData, allSymbols)
+	diffContext, err := utils.GetDiffContext(diffData, allSymbols, content)
 	if err != nil {
 		return types.DiffData{}, fmt.Errorf("failed extract diff context: %w", err)
 	}

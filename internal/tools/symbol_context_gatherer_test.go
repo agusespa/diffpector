@@ -70,7 +70,7 @@ func Add(a, b int) int {
 	}
 }
 
-func TestSymbolContextGatherer_FileFiltering(t *testing.T) {
+func TestSymbolContextGatherer_validateFiles(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "file_filtering_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)

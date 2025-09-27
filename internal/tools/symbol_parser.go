@@ -2,8 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -13,9 +11,6 @@ import (
 type LanguageParser interface {
 	// ParseFile extracts all symbols (functions, types, variables, etc.) from a file
 	ParseFile(filePath string, content []byte) ([]types.Symbol, error)
-
-	// GetSymbolContext extracts contextual information around a symbol definition
-	GetSymbolContext(filePath string, symbol types.Symbol, content []byte) (string, error)
 
 	// SupportedExtensions returns the file extensions this parser can handle
 	SupportedExtensions() []string
@@ -83,21 +78,6 @@ func (pr *ParserRegistry) ParseFile(filePath string, content []byte) ([]types.Sy
 	}
 
 	return parser.ParseFile(filePath, content)
-}
-
-// TODO is this used?
-func (pr *ParserRegistry) GetSymbolContext(filePath string, symbol types.Symbol) (string, error) {
-	parser := pr.GetParser(filePath)
-	if parser == nil {
-		return "", nil
-	}
-
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		log.Fatalf("Failed to read file: %v", err)
-	}
-
-	return parser.GetSymbolContext(filePath, symbol, content)
 }
 
 func (pr *ParserRegistry) GetParser(filePath string) LanguageParser {
