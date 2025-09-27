@@ -1,0 +1,18 @@
+--- a/internal/tools/integration_tests/code_samples/go/utils/database.go
++++ b/internal/tools/integration_tests/code_samples/go/utils/database.go
+@@ -14,11 +14,3 @@
+ 
+ 	// Simulate a database query
+ 	user := &DBUser{ // Added a comment
+-		ID:        id,
+-		Name:      "John Doe",
+-		Email:     "john.doe@example.com",
+-	}
+-
+-	return user
++		ID:    id,
++		Name:  "Jane Doe",
++		Email: "jane.doe@example.com",
++	}
++	return user
+ }
