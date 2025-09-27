@@ -8,7 +8,7 @@ import (
 	"github.com/agusespa/diffpector/internal/types"
 )
 
-func TestParseGitDiffForAddedLines(t *testing.T) {
+func TestParseGitDiffForChangedLines(t *testing.T) {
 	tests := []struct {
 		name        string
 		diffContent string
@@ -81,7 +81,7 @@ func TestParseGitDiffForAddedLines(t *testing.T) {
 			got := getDiffChangedLines(tt.diffContent)
 
 			if !maps.Equal(got, tt.want) {
-				t.Errorf("parseGitDiffForAddedLines() got = %v, want %v", got, tt.want)
+				t.Errorf("getDiffChangedLines() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -370,6 +370,7 @@ type User struct {
 	allSymbols := []types.Symbol{
 		{
 			Name:      "main",
+			Type:      "func_decl",
 			Package:   "main",
 			FilePath:  "test.go",
 			StartLine: 5,
@@ -377,6 +378,7 @@ type User struct {
 		},
 		{
 			Name:      "helper",
+			Type:      "func_decl",
 			Package:   "main",
 			FilePath:  "test.go",
 			StartLine: 11,
@@ -384,6 +386,7 @@ type User struct {
 		},
 		{
 			Name:      "User",
+			Type:      "type_decl",
 			Package:   "main",
 			FilePath:  "test.go",
 			StartLine: 18,
@@ -685,6 +688,41 @@ func helper() {
 				if !expectedSet[actualName] {
 					t.Errorf("Unexpected symbol in results: %s", actualName)
 				}
+			}
+		})
+	}
+}
+
+func TestIsDeclaration(t *testing.T) {
+	tests := []struct {
+		name       string
+		symbolType string
+		expected   bool
+	}{
+		// Go declaration types
+		{"func_decl", "func_decl", true},
+		{"method_decl", "method_decl", true},
+		{"type_decl", "type_decl", true},
+		{"const_decl", "const_decl", true},
+		{"var_decl", "var_decl", true},
+		{"field_decl", "field_decl", true},
+		{"iface_method_decl", "iface_method_decl", true},
+		{"import_decl", "import_decl", true},
+
+		// Usage types should return false
+		{"func_usage", "func_usage", false},
+		{"method_usage", "method_usage", false},
+		{"field_usage", "field_usage", false},
+		{"var_usage", "var_usage", false},
+		{"type_usage", "type_usage", false},
+		{"class_usage", "class_usage", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isDeclaration(tt.symbolType)
+			if result != tt.expected {
+				t.Errorf("IsDeclaration(%q) = %v, expected %v", tt.symbolType, result, tt.expected)
 			}
 		})
 	}

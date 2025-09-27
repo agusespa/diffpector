@@ -63,5 +63,8 @@ func (t *SymbolContextTool) Execute(args map[string]any) (types.DiffData, error)
 		return types.DiffData{}, fmt.Errorf("failed to gather symbol usage context: %w", err)
 	}
 
+	// TODO remove debugging log
+	fmt.Println("diffData.AffectedSymbols:", diffData.AffectedSymbols[0].Snippets)
+
 	return diffData, nil
 }

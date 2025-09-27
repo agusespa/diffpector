@@ -2,6 +2,7 @@ package utils
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -20,12 +21,10 @@ func GetDiffContext(diffData types.DiffData, allSymbols []types.Symbol, fileCont
 	var affectedSymbols []types.SymbolUsage
 
 	for _, symbol := range allSymbols {
-		if containsChangedLines(symbol, changedLinesSet) {
+		if containsChangedLines(symbol, changedLinesSet) && isDeclaration(symbol.Type) {
 			affectedSymbols = append(affectedSymbols, types.SymbolUsage{Symbol: symbol})
 			content := extractSymbolContent(symbol, fileLines)
-			if content != "" {
-				contextBlocks = append(contextBlocks, content)
-			}
+			contextBlocks = append(contextBlocks, content)
 		}
 	}
 
@@ -83,6 +82,22 @@ func containsChangedLines(symbol types.Symbol, changedLines map[int]bool) bool {
 		}
 	}
 	return false
+}
+
+func isDeclaration(symbolType string) bool {
+	declarationTypes := []string{
+		// Go declarations
+		"func_decl",
+		"method_decl",
+		"type_decl",
+		"const_decl",
+		"var_decl",
+		"field_decl",
+		"iface_method_decl",
+		"import_decl",
+	}
+
+	return slices.Contains(declarationTypes, symbolType)
 }
 
 func extractSymbolContent(symbol types.Symbol, fileLines []string) string {
