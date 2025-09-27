@@ -1,0 +1,17 @@
+--- a/internal/tools/integration_tests/code_samples/go/utils/user_service.go
++++ b/internal/tools/integration_tests/code_samples/go/utils/user_service.go
+@@ -53,7 +53,13 @@
+ 	// if s.policyEngine.IsRateLimited(id) { ... }
+ 
+ 	// 5. Core logic section (this is where the change will occur)
+-	return s.userRepo.GetUserByID(ctx, id)
++	user, err := s.userRepo.GetUserByID(ctx, id)
++	if err != nil {
++		s.auditLogger(fmt.Sprintf("Failed to retrieve user %s: %v", id, err))
++		return nil, fmt.Errorf("database error fetching user %s: %w", id, err)
++	}
++
++	return user, nil
+ 
+ 	// 6. Post-logic cleanup/instrumentation placeholder
+ 	// s.metricsClient.Increment("user_retrieval_count")

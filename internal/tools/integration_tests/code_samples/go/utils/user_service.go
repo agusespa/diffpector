@@ -1,17 +1,80 @@
+//go:build ignore
 
 package utils
 
-// UserService provides user-related services.
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+)
+
+// User represents a user entity.
+type User struct {
+	ID    string
+	Name  string
+	Email string
+}
+
+// UserRepository defines the interface for data access.
+type UserRepository interface {
+	GetUserByID(ctx context.Context, id string) (*User, error)
+	// Placeholder for other complex repository methods...
+	GetTotalUserCount(ctx context.Context) (int, error)
+}
+
+// UserService provides business logic for users.
 type UserService struct {
-	userRepo *UserRepository
+	userRepo UserRepository
+	// Placeholder for other dependencies...
+	auditLogger  func(msg string)
+	policyEngine interface{}
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(userRepo *UserRepository) *UserService {
-	return &UserService{userRepo: userRepo}
+func NewUserService(repo UserRepository) *UserService {
+	return &UserService{
+		userRepo: repo,
+		auditLogger: func(msg string) {
+			log.Printf("[AUDIT] %s", msg)
+		},
+	}
 }
 
-// GetUser gets a user by their ID.
-func (s *UserService) GetUser(id string) (*User, error) {
-	return s.userRepo.GetUserByID(id)
+// GetUser retrieves a user by ID. This function is intentionally large
+// to ensure the diff starts mid-body.
+func (s *UserService) GetUser(ctx context.Context, id string) (*User, error) {
+	// 1. Initial input validation
+	if id == "" {
+		s.auditLogger("Attempted to retrieve user with empty ID.")
+		return nil, fmt.Errorf("user ID cannot be empty")
+	}
+
+	// 2. Placeholder for authorization/policy check
+	// Imagine 20-30 lines of complex role-based access logic here...
+	startTime := time.Now()
+	if id == "system_admin" {
+		s.auditLogger("System admin accessed by ID lookup.")
+	} else if time.Since(startTime) > 10*time.Second {
+		// This is just filler to increase line count
+	}
+
+	// 3. Context enrichment placeholder
+	ctx = context.WithValue(ctx, "RequestID", fmt.Sprintf("req-%d", time.Now().UnixNano()))
+
+	// 4. Rate limiting check placeholder
+	// if s.policyEngine.IsRateLimited(id) { ... }
+
+	// 5. Core logic section (this is where the change will occur)
+	user, err := s.userRepo.GetUserByID(ctx, id)
+	if err != nil {
+		s.auditLogger(fmt.Sprintf("Failed to retrieve user %s: %v", id, err))
+		return nil, fmt.Errorf("database error fetching user %s: %w", id, err)
+	}
+
+	return user, nil
+
+	// 6. Post-logic cleanup/instrumentation placeholder
+	// s.metricsClient.Increment("user_retrieval_count")
+	// s.cache.Touch(id)
 }
