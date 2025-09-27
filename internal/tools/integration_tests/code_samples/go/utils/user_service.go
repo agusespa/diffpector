@@ -51,7 +51,6 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*User, error) {
 	}
 
 	// 2. Placeholder for authorization/policy check
-	// Imagine 20-30 lines of complex role-based access logic here...
 	startTime := time.Now()
 	if id == "system_admin" {
 		s.auditLogger("System admin accessed by ID lookup.")
@@ -62,10 +61,7 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*User, error) {
 	// 3. Context enrichment placeholder
 	ctx = context.WithValue(ctx, "RequestID", fmt.Sprintf("req-%d", time.Now().UnixNano()))
 
-	// 4. Rate limiting check placeholder
-	// if s.policyEngine.IsRateLimited(id) { ... }
-
-	// 5. Core logic section (this is where the change will occur)
+	// 4. Core logic section (this is where the change will occur)
 	user, err := s.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		s.auditLogger(fmt.Sprintf("Failed to retrieve user %s: %v", id, err))
@@ -73,8 +69,4 @@ func (s *UserService) GetUser(ctx context.Context, id string) (*User, error) {
 	}
 
 	return user, nil
-
-	// 6. Post-logic cleanup/instrumentation placeholder
-	// s.metricsClient.Increment("user_retrieval_count")
-	// s.cache.Touch(id)
 }

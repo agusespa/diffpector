@@ -1,9 +1,9 @@
 --- a/internal/tools/integration_tests/code_samples/go/utils/user_service.go
 +++ b/internal/tools/integration_tests/code_samples/go/utils/user_service.go
 @@ -53,7 +53,13 @@
- 	// if s.policyEngine.IsRateLimited(id) { ... }
+	ctx = context.WithValue(ctx, "RequestID", fmt.Sprintf("req-%d", time.Now().UnixNano()))
  
- 	// 5. Core logic section (this is where the change will occur)
+ 	// 4. Core logic section (this is where the change will occur)
 -	return s.userRepo.GetUserByID(ctx, id)
 +	user, err := s.userRepo.GetUserByID(ctx, id)
 +	if err != nil {
