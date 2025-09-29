@@ -2,8 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/agusespa/diffpector/internal/llm"
@@ -104,13 +102,12 @@ func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffD
 		return "", fmt.Errorf("context gathering failed: %w", err)
 	}
 
-	// Step 3: Generate review using the same process as the main app
-	review, err := a.GenerateReview(reviewContext)
+	review, err := a.GenerateReview(diffMap)
 	if err != nil {
 		return "", fmt.Errorf("generate review failed: %w", err)
 	}
 
-	// Step 4: Optionally process and print results (for CLI usage)
+	// Optionally process and print results (for CLI usage)
 	if printResults {
 		err = a.ProcessAndPrintReview(review)
 		if err != nil {
@@ -139,9 +136,7 @@ func (a *CodeReviewAgent) UpdateDiffContext(diffMap map[string]types.DiffData, p
 	return nil
 }
 
-// TODO reveiw code below this line
-
-func (a *CodeReviewAgent) GenerateReview(context *types.ReviewContext) (string, error) {
+func (a *CodeReviewAgent) GenerateReview(context map[string]types.DiffData) (string, error) {
 	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, context)
 	if err != nil {
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
@@ -186,131 +181,4 @@ func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {
 	PrintReviewSummary(criticalCount, warningCount, minorCount)
 
 	return nil
-}
-
-func (a *CodeReviewAgent) ReviewBranch(branchName string) error {
-	fmt.Printf("Starting code review on branch: %s\n", branchName)
-	return a.executeBranchReview(branchName)
-}
-
-func (a *CodeReviewAgent) executeBranchReview(branchName string) error {
-	// Step 1: Verify we're in a Git repository for symbol context
-	if err := a.verifyGitRepository(); err != nil {
-		return fmt.Errorf("branch review requires running from a Git repository: %w", err)
-	}
-
-	// Step 2: Fetch branch and get diff
-	branchFetchTool := a.toolRegistry.Get(tools.ToolNameBranchFetch)
-
-	diff, err := branchFetchTool.Execute(map[string]any{"branch_name": branchName})
-	if err != nil {
-		return fmt.Errorf("failed to fetch branch data: %w", err)
-	}
-
-	// Step 3: Extract changed files from diff
-	changedFiles := a.extractFilesFromDiff(diff)
-
-	fmt.Printf("Branch Review: %s\n", branchName)
-
-	fmt.Print("Files to be reviewed:")
-	if len(changedFiles) == 0 {
-		fmt.Println("   ✕ no changed files found in branch")
-		return nil
-	}
-
-	for _, file := range changedFiles {
-		fmt.Printf("\n   ✓ %s", file)
-	}
-	fmt.Println()
-
-	// Step 4: Use the core review logic
-	return a.ReviewChanges(diff, changedFiles)
-}
-
-func (a *CodeReviewAgent) verifyGitRepository() error {
-	if _, err := os.Stat(".git"); os.IsNotExist(err) {
-		return fmt.Errorf("not a Git repository (no .git directory found)")
-	}
-	return nil
-}
-
-func (a *CodeReviewAgent) readLocalFileContents(files []string) (map[string]string, error) {
-	fileContents := make(map[string]string)
-	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
-
-	for _, file := range files {
-		if _, err := os.Stat(file); os.IsNotExist(err) {
-			continue
-		}
-
-		content, err := readTool.Execute(map[string]any{"filename": file})
-		if err != nil {
-			fmt.Printf("Warning: Could not read local file %s: %v\n", file, err)
-			continue
-		}
-
-		absPath, err := filepath.Abs(file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get absolute path for %s: %w", file, err)
-		}
-
-		fileContents[absPath] = content
-	}
-
-	return fileContents, nil
-}
-
-func (a *CodeReviewAgent) extractFilesFromDiff(diff string) []string {
-	var files []string
-	lines := strings.SplitSeq(diff, "\n")
-
-	for line := range lines {
-		if strings.HasPrefix(line, "diff --git") {
-			parts := strings.Fields(line)
-			if len(parts) >= 4 {
-				filename := strings.TrimPrefix(parts[3], "b/")
-				files = append(files, filename)
-			}
-		}
-	}
-
-	return files
-}
-
-func (a *CodeReviewAgent) readFileContents(files []string) (map[string]string, error) {
-	fileContents := make(map[string]string)
-	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
-
-	for _, file := range files {
-		content, err := readTool.Execute(map[string]any{"filename": file})
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s: %w", file, err)
-		}
-
-		absPath, err := filepath.Abs(file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get absolute path for %s: %w", file, err)
-		}
-
-		fileContents[absPath] = content
-	}
-
-	return fileContents, nil
-}
-
-func (a *CodeReviewAgent) PrintContextSummary(context *types.ReviewContext) {
-	fmt.Print("Context gathered from:")
-
-	totalFiles := len(context.ChangedFiles)
-	if totalFiles > 0 {
-		for _, file := range context.ChangedFiles {
-			fmt.Printf("\n   ✓ %s (changed)", file)
-		}
-
-		if context.SymbolAnalysis != "" {
-			fmt.Printf("\n   ✓ Symbol analysis completed")
-		}
-	} else {
-		fmt.Println("\n   ✕ No additional context found")
-	}
 }

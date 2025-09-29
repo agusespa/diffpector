@@ -25,19 +25,22 @@ func (g *SymbolContextGatherer) GatherSymbolContext(affectedSymbols []types.Symb
 		return nil
 	}
 
-	var contextBuilder strings.Builder
+	for i := range affectedSymbols {
+		var contextBuilder strings.Builder
 
-	for _, symbolUsage := range affectedSymbols {
-		context, err := g.addSymbolContexts(symbolUsage.Symbol, projectRoot, primaryLanguage)
+		context, err := g.addSymbolContexts(affectedSymbols[i].Symbol, projectRoot, primaryLanguage)
 		if err != nil {
 			continue
 		}
 
 		if context != "" {
-			contextBuilder.WriteString(fmt.Sprintf("=== Symbol: %s (Package: %s) ===\n", symbolUsage.Symbol.Name, symbolUsage.Symbol.Package))
+			contextBuilder.WriteString(fmt.Sprintf("=== Symbol: %s (Package: %s) ===\n",
+				affectedSymbols[i].Symbol.Name,
+				affectedSymbols[i].Symbol.Package))
 			contextBuilder.WriteString(context)
-			contextBuilder.WriteString("\n")
 		}
+
+		affectedSymbols[i].Snippets = contextBuilder.String()
 	}
 
 	return nil
@@ -66,7 +69,8 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 		}
 
 		for _, s := range symbols {
-			if s.Name != symbol.Name || s.Package != symbol.Package {
+			// TODO improve with more metadata from tree sitter
+			if s.Name != symbol.Name {
 				continue
 			}
 
@@ -75,14 +79,15 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 			if strings.HasSuffix(s.Type, "_decl") {
 				contextBuilder.WriteString(fmt.Sprintf("Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
 				contextBuilder.WriteString(snippet)
-				contextBuilder.WriteString("\n\n")
+				contextBuilder.WriteString("\n")
 			}
 
 			if strings.HasSuffix(s.Type, "_usage") {
 				contextBuilder.WriteString(fmt.Sprintf("Usage in %s (line %d):\n", filePath, s.StartLine))
 				contextBuilder.WriteString(snippet)
-				contextBuilder.WriteString("\n\n")
+				contextBuilder.WriteString("\n")
 			}
+
 		}
 	}
 

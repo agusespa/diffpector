@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agusespa/diffpector/internal/tools"
@@ -14,7 +15,7 @@ import (
 func TestGatherEnhancedContext(t *testing.T) {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
-	projectRoot := filepath.Join(wd, "../../..")
+	projectRoot := wd
 
 	testCases := []struct {
 		name         string
@@ -26,16 +27,16 @@ func TestGatherEnhancedContext(t *testing.T) {
 		{
 			name:     "Go function modification",
 			language: "go",
-			diffFile: filepath.Join(projectRoot, "internal/tools/integration_tests/diff/go_func_decl.diff"),
+			diffFile: filepath.Join(projectRoot, "diff/go_func_decl.diff"),
 			changedFiles: []string{
-				filepath.Join(projectRoot, "internal/tools/integration_tests/code_samples/go/utils/user_service.go"),
+				filepath.Join(projectRoot, "code_samples/go/utils/user_service.go"),
 			},
 			validate: func(t *testing.T, result types.DiffData) {
 				assert.NotEmpty(t, result.AbsolutePath, "AbsolutePath should not be empty")
 				assert.NotEmpty(t, result.Diff, "Diff should not be empty")
 				assert.NotEmpty(t, result.DiffContext, "DiffContext should not be empty")
 
-				expectedPath := filepath.Join(projectRoot, "internal/tools/integration_tests/code_samples/go/utils/user_service.go")
+				expectedPath := filepath.Join(projectRoot, "code_samples/go/utils/user_service.go")
 				assert.Equal(t, expectedPath, result.AbsolutePath)
 
 				assert.Contains(t, result.Diff, "GetUserByID", "Diff should contain GetUserByID method call")
@@ -49,7 +50,18 @@ func TestGatherEnhancedContext(t *testing.T) {
 				assert.True(t, len(result.AffectedSymbols) > 0, "Should have at least one affected symbol")
 				assert.Equal(t, "GetUser", result.AffectedSymbols[0].Symbol.Name, "The first affected symbol name should be 'GetUser'")
 
-				// TODO test affected symbols snippets
+				getUserSymbol := result.AffectedSymbols[0]
+				assert.NotEmpty(t, getUserSymbol.Snippets, "GetUser symbol should have snippets")
+				assert.Contains(t, getUserSymbol.Snippets, "=== Symbol: GetUser (Package: utils) ===",
+					"Snippet should contain symbol header")
+
+				assert.True(t,
+					strings.Contains(getUserSymbol.Snippets, "Definition in"), "Snippet should contain definition information")
+
+				assert.True(t, strings.Contains(getUserSymbol.Snippets, "Usage in"), "Snippet should contain usage information")
+
+				assert.Contains(t, getUserSymbol.Snippets, "GetUser(ctx context", "Snippet should contain the GetUser function code")
+
 			},
 		},
 	}

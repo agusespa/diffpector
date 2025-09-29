@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/agusespa/diffpector/internal/types"
 )
 
 func TestGitDiffTool_Name(t *testing.T) {
@@ -48,8 +50,13 @@ func TestGitDiffTool_Execute_NoChanges(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 
-	if len(result) != 0 {
-		t.Errorf("Expected an empty result map, but got %d entries", len(result))
+	resultMap, ok := result.(map[string]types.DiffData)
+	if !ok {
+		t.Fatalf("Expected result to be a map[string]types.DiffData, but got %T", result)
+	}
+
+	if len(resultMap) != 0 {
+		t.Errorf("Expected an empty result map, but got %d entries", len(resultMap))
 	}
 }
 
@@ -91,13 +98,18 @@ func TestGitDiffTool_Execute_SingleModifiedFile(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 
-	if len(result) != 1 {
-		t.Fatalf("Expected 1 file in diff result, but got %d", len(result))
+	resultMap, ok := result.(map[string]types.DiffData)
+	if !ok {
+		t.Fatalf("Expected result to be a map[string]types.DiffData, but got %T", result)
 	}
 
-	diffData, ok := result["testfile.txt"]
+	if len(resultMap) != 1 {
+		t.Fatalf("Expected 1 file in diff result, but got %d", len(resultMap))
+	}
+
+	diffData, ok := resultMap["testfile.txt"]
 	if !ok {
-		t.Fatalf("Expected diff for 'testfile.txt', but not found in result keys: %v", result)
+		t.Fatalf("Expected diff for 'testfile.txt', but not found in result keys: %v", resultMap)
 	}
 
 	expectedDiffParts := []string{
@@ -147,11 +159,16 @@ func TestGitDiffTool_Execute_DeletedFile(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if len(result) != 1 {
-		t.Fatalf("Expected 1 file in diff result, but got %d", len(result))
+	resultMap, ok := result.(map[string]types.DiffData)
+	if !ok {
+		t.Fatalf("Expected result to be a map[string]types.DiffData, but got %T", result)
 	}
 
-	diffData, ok := result["file_to_delete.txt"]
+	if len(resultMap) != 1 {
+		t.Fatalf("Expected 1 file in diff result, but got %d", len(resultMap))
+	}
+
+	diffData, ok := resultMap["file_to_delete.txt"]
 	if !ok {
 		t.Fatalf("Expected 'file_to_delete.txt' in diff result")
 	}
@@ -194,11 +211,16 @@ func TestGitDiffTool_Execute_RenamedFile(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if len(result) != 1 {
-		t.Fatalf("Expected 1 file in diff result, but got %d", len(result))
+	resultMap, ok := result.(map[string]types.DiffData)
+	if !ok {
+		t.Fatalf("Expected result to be a map[string]types.DiffData, but got %T", result)
 	}
 
-	diffData, ok := result["renamed.txt"]
+	if len(resultMap) != 1 {
+		t.Fatalf("Expected 1 file in diff result, but got %d", len(resultMap))
+	}
+
+	diffData, ok := resultMap["renamed.txt"]
 	if !ok {
 		t.Fatalf("Expected 'renamed.txt' in diff result")
 	}
@@ -256,11 +278,16 @@ func TestGitDiffTool_Execute_MultipleModifiedFiles(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if len(result) != 2 {
-		t.Fatalf("Expected 2 files in diff result, but got %d", len(result))
+	resultMap, ok := result.(map[string]types.DiffData)
+	if !ok {
+		t.Fatalf("Expected result to be a map[string]types.DiffData, but got %T", result)
 	}
 
-	if diffData, ok := result["file1.txt"]; ok {
+	if len(resultMap) != 2 {
+		t.Fatalf("Expected 2 files in diff result, but got %d", len(resultMap))
+	}
+
+	if diffData, ok := resultMap["file1.txt"]; ok {
 		if !strings.Contains(diffData.Diff, "-Initial content for file 1.") || !strings.Contains(diffData.Diff, "+Modified content for file 1.") {
 			t.Errorf("Diff content for file1.txt is incorrect:\n%s", diffData.Diff)
 		}
@@ -268,7 +295,7 @@ func TestGitDiffTool_Execute_MultipleModifiedFiles(t *testing.T) {
 		t.Errorf("Expected 'file1.txt' in diff result")
 	}
 
-	if diffData, ok := result["file2.txt"]; ok {
+	if diffData, ok := resultMap["file2.txt"]; ok {
 		if !strings.Contains(diffData.Diff, "+Second line added to file 2.") {
 			t.Errorf("Diff content for file2.txt is incorrect:\n%s", diffData.Diff)
 		}
@@ -318,21 +345,6 @@ func createAndCommitFile(t *testing.T, dir, fileName, content string) {
 	}
 }
 
-func TestGitStagedFilesTool_Name(t *testing.T) {
-	tool := &GitStagedFilesTool{}
-	if tool.Name() != "git_staged_files" {
-		t.Errorf("Expected name 'git_staged_files', got %s", tool.Name())
-	}
-}
-
-func TestGitStagedFilesTool_Description(t *testing.T) {
-	tool := &GitStagedFilesTool{}
-	desc := tool.Description()
-	if !strings.Contains(strings.ToLower(desc), "staged files") {
-		t.Errorf("Expected description to contain 'staged files', got: %s", desc)
-	}
-}
-
 func TestGitGrepTool_Name(t *testing.T) {
 	tool := &GitGrepTool{}
 	if tool.Name() != "git_grep" {
@@ -346,20 +358,6 @@ func TestGitGrepTool_Description(t *testing.T) {
 	if !strings.Contains(strings.ToLower(desc), "search") {
 		t.Errorf("Expected description to contain 'search', got: %s", desc)
 	}
-}
-
-// TODO review below this line
-
-func TestGitStagedFilesTool_Execute(t *testing.T) {
-	tool := &GitStagedFilesTool{}
-	// This test expects no staged files in a clean test environment.
-	// The tool should return an empty string (no error) when no files are staged.
-	result, err := tool.Execute(map[string]any{})
-	if err != nil {
-		t.Errorf("Expected no error, got: %v", err)
-	}
-	// Empty result is valid when no files are staged
-	_ = result
 }
 
 func TestGitGrepTool_Execute_MissingPattern(t *testing.T) {
@@ -377,14 +375,18 @@ func TestGitGrepTool_Execute_MissingPattern(t *testing.T) {
 func TestGitGrepTool_Execute_WithPattern(t *testing.T) {
 	tool := &GitGrepTool{}
 
-	// This test assumes it's run within a Go project where "package" is common.
 	result, err := tool.Execute(map[string]any{"pattern": "package"})
 
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if !strings.Contains(result, "Search results for 'package'") && !strings.Contains(result, "No matches found for pattern: package") {
-		t.Errorf("Expected search results or no matches format, got: %s", result)
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("Expected result to be a string, but got %T", result)
+	}
+
+	if !strings.Contains(resultStr, "Search results for 'package'") && !strings.Contains(resultStr, "No matches found for pattern: package") {
+		t.Errorf("Expected search results or no matches format, got: %s", resultStr)
 	}
 }

@@ -30,8 +30,9 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) (critical
 	minorCount = 0
 
 	for _, issue := range issues {
-		content, err := r.readTool.Execute(map[string]any{"filename": issue.FilePath})
-		if err != nil {
+		result, err := r.readTool.Execute(map[string]any{"filename": issue.FilePath})
+		content, ok := result.(string)
+		if !ok || err != nil {
 			reportBuilder.WriteString(fmt.Sprintf("## ⚪️ Could not retrieve code for issue: %s\n", issue.Description))
 			reportBuilder.WriteString(fmt.Sprintf("**File:** `%s`\n", issue.FilePath))
 			reportBuilder.WriteString(fmt.Sprintf("**Error:** %v\n\n---\n\n", err))

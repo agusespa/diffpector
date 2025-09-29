@@ -11,14 +11,12 @@ type Tool interface {
 type ToolName string
 
 const (
-	ToolNameGitStagedFiles ToolName = "git_staged_files"
-	ToolNameGitDiff        ToolName = "git_diff"
-	ToolNameReadFile       ToolName = "read_file"
-	ToolNameSymbolContext  ToolName = "symbol_context"
-	ToolNameWriteFile      ToolName = "write_file"
-	ToolNameGitGrep        ToolName = "git_grep"
-	ToolNameAppendFile     ToolName = "append_file"
-	ToolNameBranchFetch    ToolName = "branch_fetch"
+	ToolNameGitDiff       ToolName = "git_diff"
+	ToolNameReadFile      ToolName = "read_file"
+	ToolNameSymbolContext ToolName = "symbol_context"
+	ToolNameWriteFile     ToolName = "write_file"
+	ToolNameGitGrep       ToolName = "git_grep"
+	ToolNameAppendFile    ToolName = "append_file"
 )
 
 type Registry struct {

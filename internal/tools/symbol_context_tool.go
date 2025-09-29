@@ -23,14 +23,14 @@ func NewSymbolContextTool(projectRoot string, registry *ParserRegistry) *SymbolC
 }
 
 func (t *SymbolContextTool) Name() string {
-	return "symbol_context"
+	return string(ToolNameSymbolContext)
 }
 
 func (t *SymbolContextTool) Description() string {
 	return "Analyze code changes to find symbols and gather related context"
 }
 
-func (t *SymbolContextTool) Execute(args map[string]any) (types.DiffData, error) {
+func (t *SymbolContextTool) Execute(args map[string]any) (any, error) {
 	diffData, hasDiff := args["diffData"].(types.DiffData)
 	if !hasDiff {
 		return types.DiffData{}, fmt.Errorf("diffData parameter required for symbol analysis")
@@ -62,9 +62,6 @@ func (t *SymbolContextTool) Execute(args map[string]any) (types.DiffData, error)
 	if err != nil {
 		return types.DiffData{}, fmt.Errorf("failed to gather symbol usage context: %w", err)
 	}
-
-	// TODO remove debugging log
-	fmt.Println("diffData.AffectedSymbols:", diffData.AffectedSymbols[0].Snippets)
 
 	return diffData, nil
 }

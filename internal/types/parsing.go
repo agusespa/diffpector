@@ -9,7 +9,7 @@ type DiffData struct {
 
 type SymbolUsage struct {
 	Symbol   Symbol
-	Snippets []string
+	Snippets string
 }
 
 type Symbol struct {

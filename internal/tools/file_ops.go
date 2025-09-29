@@ -8,14 +8,14 @@ import (
 type WriteFileTool struct{}
 
 func (t *WriteFileTool) Name() string {
-	return "write_file"
+	return string(ToolNameWriteFile)
 }
 
 func (t *WriteFileTool) Description() string {
 	return "Write content to a specified file"
 }
 
-func (t *WriteFileTool) Execute(args map[string]any) (string, error) {
+func (t *WriteFileTool) Execute(args map[string]any) (any, error) {
 	filename, ok := args["filename"].(string)
 	if !ok {
 		return "", fmt.Errorf("filename parameter required")
@@ -37,14 +37,14 @@ func (t *WriteFileTool) Execute(args map[string]any) (string, error) {
 type ReadFileTool struct{}
 
 func (t *ReadFileTool) Name() string {
-	return "read_file"
+	return string(ToolNameReadFile)
 }
 
 func (t *ReadFileTool) Description() string {
 	return "Read content from a specified file"
 }
 
-func (t *ReadFileTool) Execute(args map[string]any) (string, error) {
+func (t *ReadFileTool) Execute(args map[string]any) (any, error) {
 	filename, ok := args["filename"].(string)
 	if !ok {
 		return "", fmt.Errorf("filename parameter required")
@@ -61,14 +61,14 @@ func (t *ReadFileTool) Execute(args map[string]any) (string, error) {
 type AppendFileTool struct{}
 
 func (t *AppendFileTool) Name() string {
-	return "append_file"
+	return string(ToolNameAppendFile)
 }
 
 func (t *AppendFileTool) Description() string {
 	return "Append content to an existing file"
 }
 
-func (t *AppendFileTool) Execute(args map[string]any) (string, error) {
+func (t *AppendFileTool) Execute(args map[string]any) (any, error) {
 	filename, ok := args["filename"].(string)
 	if !ok {
 		return "", fmt.Errorf("filename parameter required")

@@ -124,14 +124,12 @@ func runCodeReview(mode, target string) error {
 
 	rootDir := "."
 	toolsToRegister := map[tools.ToolName]tools.Tool{
-		tools.ToolNameGitDiff:        &tools.GitDiffTool{},
-		tools.ToolNameGitStagedFiles: &tools.GitStagedFilesTool{},
-		tools.ToolNameGitGrep:        &tools.GitGrepTool{},
-		tools.ToolNameWriteFile:      &tools.WriteFileTool{},
-		tools.ToolNameReadFile:       &tools.ReadFileTool{},
-		tools.ToolNameAppendFile:     &tools.AppendFileTool{},
-		tools.ToolNameSymbolContext:  tools.NewSymbolContextTool(rootDir, parserRegistry),
-		tools.ToolNameBranchFetch:    tools.NewBranchFetchTool(cfg),
+		tools.ToolNameGitDiff:       &tools.GitDiffTool{},
+		tools.ToolNameGitGrep:       &tools.GitGrepTool{},
+		tools.ToolNameWriteFile:     &tools.WriteFileTool{},
+		tools.ToolNameReadFile:      &tools.ReadFileTool{},
+		tools.ToolNameAppendFile:    &tools.AppendFileTool{},
+		tools.ToolNameSymbolContext: tools.NewSymbolContextTool(rootDir, parserRegistry),
 	}
 
 	for name, tool := range toolsToRegister {
@@ -144,7 +142,7 @@ func runCodeReview(mode, target string) error {
 	case "diff":
 		return codeReviewAgent.ReviewStagedChanges()
 	case "branch":
-		return codeReviewAgent.ReviewBranch(target)
+		return fmt.Errorf("%s mode is not supported yet", mode)
 	default:
 		return fmt.Errorf("invalid mode: %s", mode)
 	}

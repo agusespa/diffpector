@@ -43,8 +43,13 @@ func TestWriteFileTool_Execute(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if !strings.Contains(result, "Successfully wrote") {
-		t.Errorf("Expected success message, got: %s", result)
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("Expected result to be a string, but got %T", result)
+	}
+
+	if !strings.Contains(resultStr, "Successfully wrote") {
+		t.Errorf("Expected success message, got: %s", resultStr)
 	}
 
 	// Verify file content
@@ -95,8 +100,13 @@ func TestReadFileTool_Execute(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if !strings.Contains(result, content) {
-		t.Errorf("Expected result to contain file content, got: %s", result)
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("Expected result to be a string, but got %T", result)
+	}
+
+	if !strings.Contains(resultStr, content) {
+		t.Errorf("Expected result to contain file content, got: %s", resultStr)
 	}
 }
 
@@ -144,8 +154,13 @@ func TestAppendFileTool_Execute(t *testing.T) {
 		t.Errorf("Expected no error, got: %v", err)
 	}
 
-	if !strings.Contains(result, "Successfully appended") {
-		t.Errorf("Expected success message, got: %s", result)
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("Expected result to be a string, but got %T", result)
+	}
+
+	if !strings.Contains(resultStr, "Successfully appended") {
+		t.Errorf("Expected success message, got: %s", resultStr)
 	}
 
 	// Verify file content

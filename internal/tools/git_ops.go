@@ -12,15 +12,15 @@ import (
 
 type GitDiffTool struct{}
 
-func (t *GitDiffTool) Name() ToolName {
-	return ToolNameGitDiff
+func (t *GitDiffTool) Name() string {
+	return string(ToolNameGitDiff)
 }
 
 func (t *GitDiffTool) Description() string {
 	return "Get list of diff organized by file"
 }
 
-func (t *GitDiffTool) Execute(args map[string]any) (map[string]types.DiffData, error) {
+func (t *GitDiffTool) Execute(args map[string]any) (any, error) {
 	rootCmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	repoRootBytes, err := rootCmd.Output()
 	if err != nil {
@@ -72,39 +72,17 @@ func stripGitPrefix(path string) string {
 	return path
 }
 
-// TODO reveiw below this line
-
-type GitStagedFilesTool struct{}
-
-func (t *GitStagedFilesTool) Name() string {
-	return "git_staged_files"
-}
-
-func (t *GitStagedFilesTool) Description() string {
-	return "Get list of staged files (git diff --staged --name-only)"
-}
-
-func (t *GitStagedFilesTool) Execute(args map[string]any) (string, error) {
-	cmd := exec.Command("git", "diff", "--staged", "--name-only")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get staged files: %w", err)
-	}
-
-	return string(output), nil
-}
-
 type GitGrepTool struct{}
 
 func (t *GitGrepTool) Name() string {
-	return "git_grep"
+	return string(ToolNameGitGrep)
 }
 
 func (t *GitGrepTool) Description() string {
 	return "Search for patterns in tracked files using git grep"
 }
 
-func (t *GitGrepTool) Execute(args map[string]any) (string, error) {
+func (t *GitGrepTool) Execute(args map[string]any) (any, error) {
 	pattern, ok := args["pattern"].(string)
 	if !ok {
 		return "", fmt.Errorf("pattern parameter required")
