@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 package database
 
@@ -16,7 +15,7 @@ type User struct {
 func GetUser(db *sql.DB, userID int) (*User, error) {
 	query := "SELECT id, name, email FROM users WHERE id = ?"
 	row := db.QueryRow(query, userID)
-	
+
 	var user User
 	err := row.Scan(&user.ID, &user.Name, &user.Email)
 	if err != nil {

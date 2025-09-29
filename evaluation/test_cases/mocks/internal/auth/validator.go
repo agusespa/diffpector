@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 package auth
 
@@ -20,13 +19,13 @@ func (v *AuthValidator) ValidateUser(username, password string) bool {
 
 	// Hash password with MD5 (weak)
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-	
+
 	// Check against stored hash
 	storedHash, exists := v.users[username]
 	if !exists {
 		return false
 	}
-	
+
 	return hash == storedHash
 }
 

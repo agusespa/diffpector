@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 package helper
 
@@ -15,7 +14,7 @@ func FormatUserData(name, email string, age int) string {
 	if email == "" {
 		email = "no-email@example.com"
 	}
-	
+
 	return fmt.Sprintf("%s <%s> (age: %d)", name, email, age)
 }
 

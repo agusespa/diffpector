@@ -51,7 +51,7 @@ func (b *TestEnvironmentBuilder) CreateTestEnvironment(testCase types.TestCase) 
 
 
 func (b *TestEnvironmentBuilder) parseDiffToFiles(diff string) (map[string]string, error) {
-	filenames := b.extractFilenamesFromDiff(diff)
+	filenames := b.ExtractFilenamesFromDiff(diff)
 
 	files := make(map[string]string)
 	for _, filename := range filenames {
@@ -65,7 +65,7 @@ func (b *TestEnvironmentBuilder) parseDiffToFiles(diff string) (map[string]strin
 	return files, nil
 }
 
-func (b *TestEnvironmentBuilder) extractFilenamesFromDiff(diff string) []string {
+func (b *TestEnvironmentBuilder) ExtractFilenamesFromDiff(diff string) []string {
 	var filenames []string
 	lines := strings.Split(diff, "\n")
 
@@ -82,6 +82,10 @@ func (b *TestEnvironmentBuilder) extractFilenamesFromDiff(diff string) []string 
 	}
 
 	return filenames
+}
+
+func (b *TestEnvironmentBuilder) getAbsPath(filename string) string {
+	return filepath.Join(b.mockFilesDir, filename)
 }
 
 func (b *TestEnvironmentBuilder) loadMockFileContent(filename string) (string, error) {

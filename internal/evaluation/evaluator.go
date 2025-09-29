@@ -138,10 +138,13 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 
 	// Create agent with the test provider and prompt variant
 	agent := e.createTestAgent(provider, promptVariant)
-	changedFiles := e.envBuilder.extractFilenamesFromDiff(env.Diff)
+	diffMap, err := e.createDiffMap(env)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create diff map: %w", err)
+	}
 
 	// Use the complete agent review process (same as main app) but get the result
-	review, err := agent.ReviewChangesWithResult(env.Diff, env.Files, changedFiles, false)
+	review, err := agent.ReviewChangesWithResult(diffMap, "", false)
 	if err != nil {
 		return nil, fmt.Errorf("agent review failed: %w", err)
 	}
@@ -181,6 +184,21 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 		Score:         score,
 		Timestamp:     time.Now(),
 	}, nil
+}
+
+func (e *Evaluator) createDiffMap(env *types.TestEnvironment) (map[string]types.DiffData, error) {
+	diffMap := make(map[string]types.DiffData)
+	filenames := e.envBuilder.ExtractFilenamesFromDiff(env.Diff)
+
+	for _, filename := range filenames {
+		absolutePath := e.envBuilder.getAbsPath(filename)
+		diffMap[filename] = types.DiffData{
+			AbsolutePath: absolutePath,
+			Diff:         env.Diff,
+		}
+	}
+
+	return diffMap, nil
 }
 
 func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error {

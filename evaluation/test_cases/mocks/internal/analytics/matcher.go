@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 package analytics
 
@@ -23,7 +22,7 @@ type Activity struct {
 
 func (m *ActivityMatcher) MatchUsersToActivities(users []*User, activities []*Activity) map[int][]*Activity {
 	result := make(map[int][]*Activity)
-	
+
 	for _, user := range users {
 		for _, activity := range activities {
 			if activity.UserID == user.ID {
@@ -31,6 +30,6 @@ func (m *ActivityMatcher) MatchUsersToActivities(users []*User, activities []*Ac
 			}
 		}
 	}
-	
+
 	return result
 }

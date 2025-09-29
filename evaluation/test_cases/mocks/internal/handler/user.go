@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 package handler
 
@@ -45,15 +44,15 @@ type MetricsService interface {
 }
 
 type User struct {
-	ID          int          `json:"id"`
-	Name        string       `json:"name"`
-	Email       string       `json:"email"`
-	Profile     *Profile     `json:"profile"`
-	Settings    *Settings    `json:"settings"`
-	Activity    *Activity    `json:"activity"`
+	ID          int              `json:"id"`
+	Name        string           `json:"name"`
+	Email       string           `json:"email"`
+	Profile     *Profile         `json:"profile"`
+	Settings    *Settings        `json:"settings"`
+	Activity    *Activity        `json:"activity"`
 	Preferences *UserPreferences `json:"preferences"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
 type Profile struct {
@@ -69,10 +68,10 @@ type Avatar struct {
 }
 
 type Settings struct {
-	Theme            string `json:"theme"`
-	Language         string `json:"language"`
+	Theme                string `json:"theme"`
+	Language             string `json:"language"`
 	NotificationsEnabled bool   `json:"notifications_enabled"`
-	PrivacyLevel     string `json:"privacy_level"`
+	PrivacyLevel         string `json:"privacy_level"`
 }
 
 type Activity struct {
@@ -85,7 +84,7 @@ type Activity struct {
 type UserPreferences struct {
 	EmailNotifications bool     `json:"email_notifications"`
 	Categories         []string `json:"categories"`
-	TimeZone          string   `json:"timezone"`
+	TimeZone           string   `json:"timezone"`
 }
 
 func NewUserHandler(userService UserService, cacheService CacheService, auditService AuditService, metricsService MetricsService) *UserHandler {
@@ -99,11 +98,11 @@ func NewUserHandler(userService UserService, cacheService CacheService, auditSer
 
 func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
-	
+
 	// Extract user ID from URL path
 	vars := mux.Vars(r)
 	userIDStr := vars["id"]
-	
+
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
@@ -116,9 +115,9 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
 		w.Write(cachedData)
-		
+
 		h.metricsService.IncrementCounter("user_requests", map[string]string{
-			"cache": "hit",
+			"cache":    "hit",
 			"endpoint": "get_user",
 		})
 		return
@@ -130,9 +129,9 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error fetching user %d: %v", userID, err)
 		http.Error(w, "User not found", http.StatusNotFound)
-		
+
 		h.metricsService.IncrementCounter("user_requests", map[string]string{
-			"status": "error",
+			"status":   "error",
 			"endpoint": "get_user",
 		})
 		return
@@ -155,21 +154,21 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	// Build response - potential nil pointer dereferences
 	userResponse := map[string]interface{}{
-		"id":       user.ID,
-		"email":    user.Email,
-		"profile":  user.Profile.DisplayName, // Potential nil pointer if Profile is nil
-		"settings": user.Settings.Theme,      // Potential nil pointer if Settings is nil
-		"lastSeen": user.Activity.LastLogin.Format(time.RFC3339), // Multiple potential nil pointers
+		"id":         user.ID,
+		"email":      user.Email,
+		"profile":    user.Profile.DisplayName,                     // Potential nil pointer if Profile is nil
+		"settings":   user.Settings.Theme,                          // Potential nil pointer if Settings is nil
+		"lastSeen":   user.Activity.LastLogin.Format(time.RFC3339), // Multiple potential nil pointers
 		"created_at": user.CreatedAt,
 		"updated_at": user.UpdatedAt,
 	}
-	
+
 	// Access nested properties without validation
 	if user.Profile != nil && user.Profile.Avatar != nil {
 		userResponse["avatar"] = user.Profile.Avatar.URL // Assumes Avatar exists
 		userResponse["avatar_thumbnail"] = user.Profile.Avatar.Thumbnail
 	}
-	
+
 	// Add activity information with potential nil access
 	if user.Activity != nil {
 		userResponse["login_count"] = user.Activity.LoginCount
@@ -183,8 +182,8 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if user.Preferences != nil {
 		userResponse["preferences"] = map[string]interface{}{
 			"email_notifications": user.Preferences.EmailNotifications,
-			"categories": user.Preferences.Categories,
-			"timezone": user.Preferences.TimeZone,
+			"categories":          user.Preferences.Categories,
+			"timezone":            user.Preferences.TimeZone,
 		}
 	}
 
@@ -221,9 +220,9 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	duration := time.Since(startTime)
 	h.metricsService.RecordDuration("user_request_duration", duration, map[string]string{
 		"endpoint": "get_user",
-		"status": "success",
+		"status":   "success",
 	})
-	
+
 	// Log successful retrieval with potential nil pointer access
 	log.Printf("Retrieved user: %s (%d) - %s", user.Email, user.ID, user.Profile.DisplayName)
 }
@@ -251,11 +250,11 @@ func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Potential nil pointer access without proper checks
 	response := map[string]interface{}{
-		"id": user.ID,
-		"name": user.Name,
-		"email": user.Email,
+		"id":           user.ID,
+		"name":         user.Name,
+		"email":        user.Email,
 		"display_name": user.Profile.DisplayName, // Nil pointer risk
-		"theme": user.Settings.Theme,             // Nil pointer risk
+		"theme":        user.Settings.Theme,      // Nil pointer risk
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -270,13 +269,13 @@ func getClientIP(r *http.Request) string {
 		ips := strings.Split(forwarded, ",")
 		return strings.TrimSpace(ips[0])
 	}
-	
+
 	// Check X-Real-IP header
 	realIP := r.Header.Get("X-Real-IP")
 	if realIP != "" {
 		return realIP
 	}
-	
+
 	// Fall back to RemoteAddr
 	return r.RemoteAddr
 }

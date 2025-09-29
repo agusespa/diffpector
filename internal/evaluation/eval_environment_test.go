@@ -136,7 +136,7 @@ index 0000000..1234567
 +	// helper function
 +}`
 
-	filenames := builder.extractFilenamesFromDiff(diff)
+	filenames := builder.ExtractFilenamesFromDiff(diff)
 
 	expected := []string{"main.go", "utils.go"}
 	if len(filenames) != len(expected) {
@@ -163,7 +163,7 @@ index 1234567..0000000
 -
 -func deleted() {}`
 
-	filenames := builder.extractFilenamesFromDiff(diff)
+	filenames := builder.ExtractFilenamesFromDiff(diff)
 
 	if len(filenames) != 0 {
 		t.Errorf("Expected 0 filenames (should ignore /dev/null), got %d", len(filenames))
