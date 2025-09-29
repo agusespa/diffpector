@@ -57,14 +57,14 @@ func LoadPromptTemplates() (*template.Template, error) {
 	return tmpl, nil
 }
 
-func BuildPromptWithTemplate(variantName string, data any) (string, error) {
+func BuildPromptWithTemplate(variantName string, payload string) (string, error) {
 	templates, err := LoadPromptTemplates()
 	if err != nil {
 		return "", fmt.Errorf("failed to load templates: %w", err)
 	}
 
 	var result strings.Builder
-	err = templates.ExecuteTemplate(&result, variantName, data)
+	err = templates.ExecuteTemplate(&result, variantName, payload)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute template %s: %w", variantName, err)
 	}
@@ -73,13 +73,8 @@ func BuildPromptWithTemplate(variantName string, data any) (string, error) {
 }
 
 const defaultPromptTemplate = `You are an expert code reviewer analyzing code changes for real issues.
-
 === CODE CHANGES TO REVIEW ===
-{{.Diff}}
-
-{{if .SymbolAnalysis}}=== REFERENCE CONTEXT (DO NOT REVIEW) ===
-{{.SymbolAnalysis}}
-{{end}}
+{{.}}
 
 === ANALYSIS INSTRUCTIONS ===
 
@@ -131,11 +126,7 @@ CRITICAL RULES:
 const comprehensivePromptTemplate = `You are a Principal Software Engineer, an expert in code reviewing, analyzing code changes for real issues and providing constructive feedback.
 
 === CODE CHANGES TO REVIEW ===
-{{.Diff}}
-
-{{if .SymbolAnalysis}}=== REFERENCE CONTEXT (DO NOT REVIEW) ===
-{{.SymbolAnalysis}}
-{{end}}
+{{.}}
 
 === ANALYSIS INSTRUCTIONS ===
 
@@ -188,11 +179,7 @@ CRITICAL RULES:
 const optimizedPromptTemplate = `You are a Principal Software Engineer performing code review. Your task is to identify real issues in code changes and return results in the exact specified format.
 
 === CODE CHANGES TO REVIEW ===
-{{.Diff}}
-
-{{if .SymbolAnalysis}}=== REFERENCE CONTEXT (FOR UNDERSTANDING ONLY - DO NOT REVIEW) ===
-{{.SymbolAnalysis}}
-{{end}}
+{{.}}
 
 === ANALYSIS PROCESS ===
 

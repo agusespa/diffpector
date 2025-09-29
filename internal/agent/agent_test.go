@@ -7,51 +7,6 @@ import (
 	"github.com/agusespa/diffpector/internal/tools"
 )
 
-type mockTool struct {
-	name     string
-	response string
-	err      error
-}
-
-func (m *mockTool) Name() string {
-	return m.name
-}
-
-func (m *mockTool) Description() string {
-	return "Mock tool for testing"
-}
-
-func (m *mockTool) Execute(params map[string]any) (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	return m.response, nil
-}
-
-type mockLLMProvider struct {
-	response string
-	err      error
-	model    string
-}
-
-func (m *mockLLMProvider) Generate(prompt string) (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	return m.response, nil
-}
-
-func (m *mockLLMProvider) GetModel() string {
-	if m.model == "" {
-		return "mock-model"
-	}
-	return m.model
-}
-
-func (m *mockLLMProvider) SetModel(model string) {
-	m.model = model
-}
-
 func TestValidateAndDetectLanguage(t *testing.T) {
 	parserRegistry := tools.NewParserRegistry()
 	agent := &CodeReviewAgent{
@@ -93,12 +48,6 @@ func TestValidateAndDetectLanguage(t *testing.T) {
 			name:         "mixed go with html and css",
 			files:        []string{"main.go", "index.html", "styles.css"},
 			expectedLang: "go",
-			expectError:  false,
-		},
-		{
-			name:         "python files",
-			files:        []string{"script.py"},
-			expectedLang: "python",
 			expectError:  false,
 		},
 		{

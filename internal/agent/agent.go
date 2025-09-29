@@ -131,17 +131,38 @@ func (a *CodeReviewAgent) UpdateDiffContext(diffMap map[string]types.DiffData, p
 		}
 
 		diffData.DiffContext = updatedData.DiffContext
+		diffData.AffectedSymbols = updatedData.AffectedSymbols
 	}
 
 	return nil
 }
 
-func (a *CodeReviewAgent) GenerateReview(context map[string]types.DiffData) (string, error) {
-	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, context)
+func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (string, error) {
+	var combinedContext strings.Builder
+
+	for path, data := range diffMap {
+		combinedContext.WriteString(fmt.Sprintf("=== Diff for changed file: %s\n%s\n ===", path, data.Diff))
+
+		if data.DiffContext != "" {
+			combinedContext.WriteString(fmt.Sprintf("\n--- Expanded Context ---\n%s\n", data.DiffContext))
+		}
+
+		if len(data.AffectedSymbols) > 0 {
+			combinedContext.WriteString("\n--- Affected Symbols ---\n")
+			for _, usage := range data.AffectedSymbols {
+				symbol := usage.Symbol
+				combinedContext.WriteString(fmt.Sprintf("  Symbol: %s (%s)\n", symbol.Name, symbol.Type))
+				combinedContext.WriteString(fmt.Sprintf("  Package: %s\n", symbol.Package))
+				combinedContext.WriteString(fmt.Sprintf("  File: %s\n", symbol.FilePath))
+				combinedContext.WriteString(fmt.Sprintf("  Usage:\n%s\n", usage.Snippets))
+			}
+		}
+	}
+
+	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, combinedContext.String())
 	if err != nil {
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}
-	fmt.Println(prompt)
 
 	spinner := spinner.New("Analyzing changes...")
 	spinner.Start()

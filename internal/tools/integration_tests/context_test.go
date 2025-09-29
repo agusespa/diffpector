@@ -86,7 +86,10 @@ func TestGatherEnhancedContext(t *testing.T) {
 			result, err := symbolContextTool.Execute(args)
 			require.NoError(t, err, "Tool execution should not fail")
 
-			tc.validate(t, result)
+			resultData, ok := result.(types.DiffData)
+			require.True(t, ok, "Tool result should be of type types.DiffData")
+
+			tc.validate(t, resultData)
 		})
 	}
 }
