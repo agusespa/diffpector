@@ -34,7 +34,7 @@ func (g *SymbolContextGatherer) GatherSymbolContext(affectedSymbols []types.Symb
 		}
 
 		if context != "" {
-			contextBuilder.WriteString(fmt.Sprintf("=== Symbol: %s (Package: %s) ===\n",
+			contextBuilder.WriteString(fmt.Sprintf(">>>>> Symbol: %s (Package: %s)\n",
 				affectedSymbols[i].Symbol.Name,
 				affectedSymbols[i].Symbol.Package))
 			contextBuilder.WriteString(context)
@@ -56,18 +56,17 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 	}
 
 	var contextBuilder strings.Builder
+	seen := make(map[string]bool)
 
 	for _, filePath := range candidateFiles {
 		content, err := os.ReadFile(filepath.Join(filePath))
 		if err != nil {
 			continue
 		}
-
 		symbols, err := g.parserRegistry.ParseFile(filePath, content)
 		if err != nil {
 			continue
 		}
-
 		for _, s := range symbols {
 			// TODO improve with more metadata from tree sitter
 			if s.Name != symbol.Name {
@@ -77,17 +76,24 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 			snippet := extractSnippet(content, s.StartLine, s.EndLine)
 
 			if strings.HasSuffix(s.Type, "_decl") {
-				contextBuilder.WriteString(fmt.Sprintf("Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
-				contextBuilder.WriteString(snippet)
-				contextBuilder.WriteString("\n")
+				key := fmt.Sprintf("decl:%s:%d-%d", filePath, s.StartLine, s.EndLine)
+				if !seen[key] {
+					seen[key] = true
+					contextBuilder.WriteString(fmt.Sprintf("Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
+					contextBuilder.WriteString(snippet)
+					contextBuilder.WriteString("\n")
+				}
 			}
 
 			if strings.HasSuffix(s.Type, "_usage") {
-				contextBuilder.WriteString(fmt.Sprintf("Usage in %s (line %d):\n", filePath, s.StartLine))
-				contextBuilder.WriteString(snippet)
-				contextBuilder.WriteString("\n")
+				key := fmt.Sprintf("usage:%s:%d-%d", filePath, s.StartLine, s.EndLine)
+				if !seen[key] {
+					seen[key] = true
+					contextBuilder.WriteString(fmt.Sprintf("Usage in %s (line %d):\n", filePath, s.StartLine))
+					contextBuilder.WriteString(snippet)
+					contextBuilder.WriteString("\n")
+				}
 			}
-
 		}
 	}
 

@@ -11,15 +11,9 @@ A local code review agent powered by Ollama that analyzes Git commits to identif
 
 ## Installation
 
-### Pre-built Binaries
 Download the latest binary for your platform from [Releases](https://github.com/yourusername/diffpector/releases):
 - Extract the archive
 - Move the binary to your PATH (e.g., `/usr/local/bin` on macOS/Linux)
-
-### Go Install
-```bash
-go install github.com/yourusername/diffpector/cmd/diffpector@latest
-```
 
 ## Prerequisites
 
@@ -31,46 +25,22 @@ Run `ollama serve`.
 - Must be run from within a Git repository
 - Requires commits to analyze
 
-## Usage
-
-```bash
-# Basic usage (uses config.json in current directory)
-diffpector
-
-# Use custom config file
-diffpector --config my-config.json
-
-# Show help
-diffpector --help
-```
-
 **Important**: Run diffpector from your project's root directory (where your `.git` folder is located). The tool needs to be executed from the repository root to properly analyze symbol context and cross-references.
 
-## Supported Languages
-
-Diffpector provides intelligent symbol analysis for the following languages:
-
-- **Go** (.go files): Functions, methods, types, constants, variables
-- **TypeScript** (.ts, .tsx files): Functions, classes, interfaces, types, enums, methods, properties, variables
-- **Java** (.java files): Classes, interfaces, methods, constructors, fields, constants, enums, annotations
-- **Python** (.py, .pyw files): Functions, classes, methods, variables, imports
-
-The tool automatically detects the language based on file extensions and provides context-aware analysis including symbol usage tracking and cross-reference detection.
-
 ## Configuration
-
-The `config.json` file contains the variables for the api and model.
-The only api currently supported is `ollama`.
-
+The agent will execute by default with the following configuration parameters:
 ```json
 {
   "llm": {
     "provider": "ollama",
-    "model": "mistral",
+    "model": "qwen2.5-coder:14b",
     "base_url": "http://localhost:11434",
   }
 }
 ```
+
+The defaults can be overriden by creating a `diffpectrc.json` file contains the variables for the api and model.
+The only api currently supported is `ollama`.
 
 ### Recommended Models
 - **qwen2.5-coder:14b** - best balance between accuracy and performance

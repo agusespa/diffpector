@@ -55,13 +55,14 @@ func (a *CodeReviewAgent) executeReview() error {
 
 	fmt.Print("Files to be reviewed:")
 	if len(changedFilesPaths) == 0 {
-		fmt.Println("   - no staged changes found - use 'git add' to stage files for review")
+		fmt.Println("   - no staged changes found (use 'git add' to stage files for review)")
 		return nil
 	}
 
 	for _, file := range changedFilesPaths {
-		fmt.Printf("\n   + %s", file)
+		fmt.Printf("\n   - %s", file)
 	}
+	fmt.Println()
 
 	primaryLanguage, err := a.ValidateAndDetectLanguage(changedFilesPaths)
 	if err != nil {
@@ -120,7 +121,8 @@ func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffD
 
 func (a *CodeReviewAgent) UpdateDiffContext(diffMap map[string]types.DiffData, primaryLanguage string) error {
 	symbolContextTool := a.toolRegistry.Get(tools.ToolNameSymbolContext)
-	for _, diffData := range diffMap {
+
+	for key, diffData := range diffMap {
 		updatedDataResult, err := symbolContextTool.Execute(map[string]any{"diffData": diffData, "primaryLanguage": primaryLanguage})
 		if err != nil {
 			return fmt.Errorf("symbol analysis failed: %w", err)
@@ -132,6 +134,8 @@ func (a *CodeReviewAgent) UpdateDiffContext(diffMap map[string]types.DiffData, p
 
 		diffData.DiffContext = updatedData.DiffContext
 		diffData.AffectedSymbols = updatedData.AffectedSymbols
+
+		diffMap[key] = diffData
 	}
 
 	return nil
@@ -141,21 +145,15 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 	var combinedContext strings.Builder
 
 	for path, data := range diffMap {
-		combinedContext.WriteString(fmt.Sprintf("=== Diff for changed file: %s\n%s\n ===", path, data.Diff))
+		combinedContext.WriteString(fmt.Sprintf(">>> Diff for changed file: %s\n%s\n", path, data.Diff))
 
 		if data.DiffContext != "" {
-			combinedContext.WriteString(fmt.Sprintf("\n--- Expanded Context ---\n%s\n", data.DiffContext))
+			combinedContext.WriteString(fmt.Sprintf("\n>>>> Expanded Diff Context\n%s\n", data.DiffContext))
 		}
 
-		if len(data.AffectedSymbols) > 0 {
-			combinedContext.WriteString("\n--- Affected Symbols ---\n")
-			for _, usage := range data.AffectedSymbols {
-				symbol := usage.Symbol
-				combinedContext.WriteString(fmt.Sprintf("  Symbol: %s (%s)\n", symbol.Name, symbol.Type))
-				combinedContext.WriteString(fmt.Sprintf("  Package: %s\n", symbol.Package))
-				combinedContext.WriteString(fmt.Sprintf("  File: %s\n", symbol.FilePath))
-				combinedContext.WriteString(fmt.Sprintf("  Usage:\n%s\n", usage.Snippets))
-			}
+		combinedContext.WriteString("\n>>>> Affected Symbols\n")
+		for _, usage := range data.AffectedSymbols {
+			combinedContext.WriteString(usage.Snippets)
 		}
 	}
 
@@ -163,6 +161,8 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}
+
+	fmt.Println("\n Prompt:\n", prompt)
 
 	spinner := spinner.New("Analyzing changes...")
 	spinner.Start()

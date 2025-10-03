@@ -52,7 +52,7 @@ func TestGatherEnhancedContext(t *testing.T) {
 
 				getUserSymbol := result.AffectedSymbols[0]
 				assert.NotEmpty(t, getUserSymbol.Snippets, "GetUser symbol should have snippets")
-				assert.Contains(t, getUserSymbol.Snippets, "=== Symbol: GetUser (Package: utils) ===",
+				assert.Contains(t, getUserSymbol.Snippets, ">>>>> Symbol: GetUser (Package: utils)",
 					"Snippet should contain symbol header")
 
 				assert.True(t,

@@ -28,6 +28,8 @@ func GetDiffContext(diffData types.DiffData, allSymbols []types.Symbol, fileCont
 		}
 	}
 
+	// fmt.Println("DIFF CONTEXT at diff_parser.go: ", contextBlocks)
+
 	return types.ContextResult{
 		Context:         strings.Join(contextBlocks, "\n\n"),
 		AffectedSymbols: affectedSymbols,
