@@ -9,7 +9,6 @@ import (
 	"github.com/agusespa/diffpector/internal/types"
 )
 
-// TestEnvironmentBuilder handles creation and management of test environments
 type TestEnvironmentBuilder struct {
 	suiteBaseDir string
 	mockFilesDir string
@@ -22,7 +21,6 @@ func NewTestEnvironmentBuilder(suiteBaseDir, mockFilesDir string) *TestEnvironme
 	}
 }
 
-// CreateTestEnvironment creates a test environment from a test case
 func (b *TestEnvironmentBuilder) CreateTestEnvironment(testCase types.TestCase) (*types.TestEnvironment, error) {
 	if testCase.DiffFile == "" {
 		return &types.TestEnvironment{
@@ -48,8 +46,6 @@ func (b *TestEnvironmentBuilder) CreateTestEnvironment(testCase types.TestCase) 
 	}, nil
 }
 
-
-
 func (b *TestEnvironmentBuilder) parseDiffToFiles(diff string) (map[string]string, error) {
 	filenames := b.ExtractFilenamesFromDiff(diff)
 
@@ -67,9 +63,9 @@ func (b *TestEnvironmentBuilder) parseDiffToFiles(diff string) (map[string]strin
 
 func (b *TestEnvironmentBuilder) ExtractFilenamesFromDiff(diff string) []string {
 	var filenames []string
-	lines := strings.Split(diff, "\n")
+	lines := strings.SplitSeq(diff, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		if strings.HasPrefix(line, "+++") {
 			parts := strings.Fields(line)
 			if len(parts) >= 2 {
@@ -101,7 +97,3 @@ func (b *TestEnvironmentBuilder) loadMockFileContent(filename string) (string, e
 
 	return string(content), nil
 }
-
-
-
-

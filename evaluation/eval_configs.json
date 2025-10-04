@@ -1,0 +1,25 @@
+[
+  {
+    "key": "prompt-comparison",
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "models": ["qwen3-coder:30b"],
+    "prompts": ["optimized"],
+    "runs": 1
+  },
+  {
+    "key": "model-comparison",
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "models": [
+      "qwen2.5-coder:7b",
+      "qwen2.5-coder:14b",
+      "codellama:13b",
+      "llama3.1:8b",
+      "qwen3:8b",
+      "qwen3:14b"
+    ],
+    "prompts": ["optimized"],
+    "runs": 3
+  }
+]

@@ -55,6 +55,8 @@ func (p *OllamaProvider) Generate(prompt string) (string, error) {
 		}
 	}()
 
+	fmt.Println("RES: ", resp)
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ollama request failed with status: %d", resp.StatusCode)
 	}

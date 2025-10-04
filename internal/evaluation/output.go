@@ -6,6 +6,18 @@ import (
 	"github.com/agusespa/diffpector/internal/types"
 )
 
+func PrintRunHeader(modelName, promptVariant string, numRuns int) {
+	if numRuns == 1 {
+		fmt.Printf("Running evaluation for model: %s, prompt: %s\n", modelName, promptVariant)
+	} else {
+		fmt.Printf("Running %d evaluations for model: %s, prompt: %s\n", numRuns, modelName, promptVariant)
+	}
+}
+
+func PrintMultiRunProgress(runNum, totalRuns int) {
+	fmt.Printf("\n--- Run %d/%d ---\n", runNum, totalRuns)
+}
+
 func PrintSummary(r *types.EvaluationRun) {
 	fmt.Printf("\n--- Summary for %s (%s) ---\n", r.Model, r.PromptVariant)
 	fmt.Printf("  Average Score: %.2f\n", r.AverageScore)
@@ -37,9 +49,9 @@ func PrintEvaluationSummary(r *types.EvaluationResult) {
 			} else {
 				qualityIndicator = "🔴 POOR"
 			}
-			
+
 			fmt.Printf("    %s: %.2f avg (±%.3f) - %.1f%% consistent - Quality: %.2f %s\n",
-				stats.TestCaseName, stats.AverageScore, stats.ScoreStdDev, 
+				stats.TestCaseName, stats.AverageScore, stats.ScoreStdDev,
 				stats.ConsistencyScore*100, stats.QualityScore, qualityIndicator)
 		}
 	}
@@ -52,16 +64,4 @@ func PrintTestResult(result *types.TestCaseResult, err error) {
 	} else {
 		fmt.Printf("  DONE (%.2fs, score: %.2f)\n", result.ExecutionTime.Seconds(), result.Score)
 	}
-}
-
-func PrintRunHeader(modelName, promptVariant string, numRuns int) {
-	if numRuns == 1 {
-		fmt.Printf("Running evaluation for model: %s, prompt: %s\n", modelName, promptVariant)
-	} else {
-		fmt.Printf("Running %d evaluations for model: %s, prompt: %s\n", numRuns, modelName, promptVariant)
-	}
-}
-
-func PrintMultiRunProgress(runNum, totalRuns int) {
-	fmt.Printf("\n--- Run %d/%d ---\n", runNum, totalRuns)
 }

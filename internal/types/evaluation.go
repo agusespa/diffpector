@@ -2,7 +2,21 @@ package types
 
 import "time"
 
-// TestCase represents a single evaluation test case
+type EvaluationConfig struct {
+	Key      string   `json:"key"`
+	Provider string   `json:"provider"`
+	BaseURL  string   `json:"base_url"`
+	Models   []string `json:"models"`
+	Prompts  []string `json:"prompts"`
+	Runs     int      `json:"runs,omitempty"`
+}
+
+type EvaluationSuite struct {
+	TestCases    []TestCase `json:"test_cases"`
+	BaseDir      string     `json:"base_dir"`
+	MockFilesDir string     `json:"mock_files_dir,omitempty"`
+}
+
 type TestCase struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
@@ -11,7 +25,6 @@ type TestCase struct {
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
-// ExpectedResults defines what results are expected from a test case
 type ExpectedResults struct {
 	ShouldFindIssues bool     `json:"should_find_issues"`
 	ExpectedSeverity []string `json:"expected_severity,omitempty"`
@@ -20,14 +33,6 @@ type ExpectedResults struct {
 	MaxIssues        int      `json:"max_issues,omitempty"`
 }
 
-// EvaluationSuite contains a collection of test cases
-type EvaluationSuite struct {
-	TestCases    []TestCase `json:"test_cases"`
-	BaseDir      string     `json:"base_dir"`
-	MockFilesDir string     `json:"mock_files_dir,omitempty"`
-}
-
-// EvaluationRun represents a single evaluation run
 type EvaluationRun struct {
 	Model         string           `json:"model"`
 	Provider      string           `json:"provider"`
@@ -41,7 +46,6 @@ type EvaluationRun struct {
 	RunNumber     int              `json:"run_number,omitempty"`
 }
 
-// EvaluationResult represents the complete result of an evaluation (single or multiple runs)
 type EvaluationResult struct {
 	Model           string                   `json:"model"`
 	Provider        string                   `json:"provider"`
@@ -55,7 +59,6 @@ type EvaluationResult struct {
 	TestCaseStats   map[string]TestCaseStats `json:"test_case_stats"`
 }
 
-// EvaluationStats contains statistical analysis across multiple runs
 type EvaluationStats struct {
 	AverageScore       float64 `json:"average_score"`
 	ScoreStdDev        float64 `json:"score_std_dev"`
@@ -67,7 +70,6 @@ type EvaluationStats struct {
 	DurationStdDev     float64 `json:"duration_std_dev_seconds"`
 }
 
-// TestCaseStats contains statistics for a specific test case across runs
 type TestCaseStats struct {
 	TestCaseName     string  `json:"test_case_name"`
 	AverageScore     float64 `json:"average_score"`
@@ -77,7 +79,6 @@ type TestCaseStats struct {
 	QualityScore     float64 `json:"quality_score"`     // Combines performance and consistency (high score + high consistency = good, low score + high consistency = bad)
 }
 
-// TestCaseResult represents the result of a single test case evaluation
 type TestCaseResult struct {
 	TestCase      TestCase      `json:"test_case"`
 	Model         string        `json:"model"`
@@ -90,25 +91,6 @@ type TestCaseResult struct {
 	Timestamp     time.Time     `json:"timestamp"`
 }
 
-// EvaluationConfig represents configuration for an evaluation run
-type EvaluationConfig struct {
-	Key         string   `json:"key"`
-	Description string   `json:"description,omitempty"`
-	Provider    string   `json:"provider"`
-	BaseURL     string   `json:"base_url"`
-	Models      []string `json:"models"`
-	Prompts     []string `json:"prompts"`
-	Runs        int      `json:"runs,omitempty"`
-}
-
-// PromptVariant represents a prompt template variant
-type PromptVariant struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Template    string `json:"template"`
-}
-
-// TestEnvironment represents a simulated test environment
 type TestEnvironment struct {
 	Files map[string]string // filename -> content
 	Diff  string

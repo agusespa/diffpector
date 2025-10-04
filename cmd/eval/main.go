@@ -15,7 +15,7 @@ func main() {
 	var (
 		suiteFile      = flag.String("suite", "evaluation/test_suite.json", "Path to evaluation test suite")
 		resultsDir     = flag.String("results", "evaluation/results", "Directory to store results")
-		configFile     = flag.String("config", "evaluation/model_configs.json", "Path to evaluation config file")
+		configFile     = flag.String("config", "evaluation/eval_configs.json", "Path to evaluation config file")
 		variant        = flag.String("variant", "", "Variant Key of the specific configuration to run from the config file")
 		compare        = flag.Bool("compare", false, "Compare existing results instead of running new evaluation")
 		comparePrompts = flag.Bool("compare-prompts", false, "Compare prompt variants")
@@ -77,19 +77,10 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
 			continue
 		}
 		fmt.Printf("--- Running Configuration: %s ---\n", config.Key)
-		if config.Description != "" {
-			fmt.Printf("    %s\n", config.Description)
-		}
-
-		// Use config runs, default to 1 if not specified
-		configRuns := config.Runs
-		if configRuns == 0 {
-			configRuns = 1
-		}
 
 		for _, model := range config.Models {
 			for _, prompt := range config.Prompts {
-				runSingleEvaluation(evaluator, config.Provider, model, prompt, config.BaseURL, configRuns)
+				runSingleEvaluation(evaluator, config.Provider, model, prompt, config.BaseURL, config.Runs)
 			}
 		}
 	}
@@ -117,7 +108,6 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, promp
 		BaseURL: baseURL,
 	}
 
-	// Run evaluation
 	result, err := evaluator.RunEvaluation(llmConfig, prompt, runs)
 	if err != nil {
 		fmt.Printf("Error running evaluation for %s/%s: %v\n", model, prompt, err)
@@ -125,16 +115,13 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, promp
 	}
 
 	if runs == 1 {
-		// For single runs, print the individual run summary
 		if len(result.IndividualRuns) > 0 {
 			evaluation.PrintSummary(&result.IndividualRuns[0])
 		}
 	} else {
-		// For multiple runs, print evaluation summary
 		evaluation.PrintEvaluationSummary(result)
 	}
 
-	// Save results
 	if err := evaluator.SaveEvaluationResults(result); err != nil {
 		fmt.Printf("Warning: failed to save results: %v\n", err)
 	}

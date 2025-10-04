@@ -1,9 +1,9 @@
 EVAL_GO_FILE := ./cmd/eval/main.go
 EVAL_RESULTS_DIR := evaluation/results
-EVAL_CONFIG_FILE := evaluation/model_configs.json
+EVAL_CONFIG_FILE := evaluation/eval_configs.json
 EVAL_SUITE_FILE := evaluation/test_suite.json
 
-.PHONY: eval-help eval-compare-models eval-compare-prompts eval-list-prompts eval-prompts eval-models eval-models-sm eval-comprehensive eval-clean
+.PHONY: eval-help eval-compare-models eval-compare-prompts eval-list-prompts eval-prompts eval-models eval-models-sm eval-clean
 
 eval-help:
 	@echo "=============================="
@@ -13,7 +13,6 @@ eval-help:
 	@echo "🚀 Running Evaluations:"
 	@echo "  make eval-prompts          - Compare prompt variants using default model"
 	@echo "  make eval-models           - Compare model performance using default prompt"
-	@echo "  make eval-comprehensive    - Run full evaluation matrix (all models × all prompts)"
 	@echo ""
 	@echo "📊 Analyzing Results:"
 	@echo "  make eval-compare-prompts  - Analyze existing prompt comparison results"
@@ -50,10 +49,6 @@ eval-models:
 eval-models-sm:
 	@echo "Running model evaluation..."
 	@go run $(EVAL_GO_FILE) --variant small-model-comparison --config $(EVAL_CONFIG_FILE) --suite $(EVAL_SUITE_FILE) --results $(EVAL_RESULTS_DIR)
-
-eval-comprehensive:
-	@echo "Running comprehensive evaluation..."
-	@go run $(EVAL_GO_FILE) --variant full-comprehensive --config $(EVAL_CONFIG_FILE) --suite $(EVAL_SUITE_FILE) --results $(EVAL_RESULTS_DIR)
 
 eval-clean:
 	@echo "Cleaning evaluation results..."

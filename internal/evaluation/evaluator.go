@@ -9,7 +9,6 @@ import (
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
 	"github.com/agusespa/diffpector/internal/utils"
-	"github.com/agusespa/diffpector/pkg/config"
 )
 
 type EvaluationConfig = types.EvaluationConfig
@@ -47,7 +46,7 @@ func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
 }
 
 func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant string, numRuns int) (*types.EvaluationResult, error) {
-	if numRuns <= 0 {
+	if numRuns < 1 {
 		numRuns = 1
 	}
 
@@ -130,7 +129,6 @@ func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVa
 func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider, promptVariant string) (*TestCaseResult, error) {
 	startTime := time.Now()
 
-	// Load test environment (diff and files)
 	env, err := e.envBuilder.CreateTestEnvironment(testCase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test environment: %w", err)
@@ -206,6 +204,5 @@ func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error 
 }
 
 func (e *Evaluator) createTestAgent(provider llm.Provider, promptVariant string) *agent.CodeReviewAgent {
-	cfg := &config.Config{}
-	return agent.NewCodeReviewAgent(provider, e.toolRegistry, cfg, e.parserRegistry, promptVariant)
+	return agent.NewCodeReviewAgent(provider, e.parserRegistry, e.toolRegistry, promptVariant)
 }

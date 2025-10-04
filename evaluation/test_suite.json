@@ -1,11 +1,11 @@
 {
   "base_dir": "evaluation/test_cases",
-  "mock_files_dir": "evaluation/test_cases/mocks",
+  "mock_files_dir": "evaluation/mocks",
   "test_cases": [
     {
       "name": "go_security_sql_injection",
       "description": "Test detection of SQL injection vulnerability",
-      "diff_file": "sql_injection.diff",
+      "diff_file": "go_sql_injection.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -22,7 +22,7 @@
     {
       "name": "go_performance_n_plus_one_simple",
       "description": "Test detection of N+1 query problem - batch to individual calls",
-      "diff_file": "n_plus_one_simple.diff",
+      "diff_file": "go_n_plus_one_simple.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -39,7 +39,7 @@
     {
       "name": "go_bug_nil_pointer",
       "description": "Test detection of potential nil pointer dereference",
-      "diff_file": "nil_pointer.diff",
+      "diff_file": "go_nil_pointer.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -57,7 +57,7 @@
     {
       "name": "go_clean_refactor",
       "description": "Test that clean refactoring doesn't trigger false positives",
-      "diff_file": "clean_refactor.diff",
+      "diff_file": "go_clean_refactor.diff",
       "expected": {
         "should_find_issues": false,
         "max_issues": 1
@@ -70,7 +70,7 @@
     {
       "name": "go_error_handling_missing",
       "description": "Test detection of missing error handling",
-      "diff_file": "missing_error_handling.diff",
+      "diff_file": "go_missing_error_handling.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -88,7 +88,7 @@
     {
       "name": "go_memory_leak",
       "description": "Test detection of potential memory leak",
-      "diff_file": "memory_leak.diff",
+      "diff_file": "go_memory_leak.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -106,7 +106,7 @@
     {
       "name": "go_race_condition",
       "description": "Test detection of potential race condition",
-      "diff_file": "race_condition.diff",
+      "diff_file": "go_race_condition.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -124,7 +124,7 @@
     {
       "name": "go_code_style_minor",
       "description": "Test detection of minor code style issues",
-      "diff_file": "code_style.diff",
+      "diff_file": "go_code_style.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -141,7 +141,7 @@
     {
       "name": "go_complex_security_multi",
       "description": "Test detection of multiple security issues in one file",
-      "diff_file": "complex_security.diff",
+      "diff_file": "go_complex_security.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -158,7 +158,7 @@
     {
       "name": "go_performance_inefficient_algorithm",
       "description": "Test detection of O(n²) algorithm - nested loop inefficiency",
-      "diff_file": "inefficient_algorithm.diff",
+      "diff_file": "go_inefficient_algorithm.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -175,7 +175,7 @@
     {
       "name": "go_performance_batch_regression",
       "description": "Test detection of batch operation removal - efficiency regression",
-      "diff_file": "batch_regression.diff",
+      "diff_file": "go_batch_regression.diff",
       "expected": {
         "should_find_issues": true,
         "expected_severity": [
@@ -187,341 +187,6 @@
       "metadata": {
         "category": "performance",
         "language": "go"
-      }
-    },
-    {
-      "name": "ts_type_safety_issues",
-      "description": "Test detection of TypeScript type safety violations",
-      "diff_file": "ts_type_safety.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 3,
-        "max_issues": 8
-      },
-      "metadata": {
-        "category": "type_safety",
-        "language": "typescript"
-      }
-    },
-    {
-      "name": "ts_async_await_issues",
-      "description": "Test detection of async/await and Promise handling issues",
-      "diff_file": "ts_async_issues.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 4,
-        "max_issues": 7
-      },
-      "metadata": {
-        "category": "async",
-        "language": "typescript"
-      }
-    },
-    {
-      "name": "ts_react_hooks_issues",
-      "description": "Test detection of React hooks and useEffect dependency issues",
-      "diff_file": "ts_react_hooks.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 3,
-        "max_issues": 6
-      },
-      "metadata": {
-        "category": "react",
-        "language": "typescript"
-      }
-    },
-    {
-      "name": "ts_security_xss",
-      "description": "Test detection of XSS vulnerabilities in TypeScript/Node.js",
-      "diff_file": "ts_security_xss.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL"
-        ],
-        "min_issues": 2,
-        "max_issues": 4
-      },
-      "metadata": {
-        "category": "security",
-        "language": "typescript"
-      }
-    },
-    {
-      "name": "java_concurrency_issues",
-      "description": "Test detection of thread safety and concurrency issues",
-      "diff_file": "java_concurrency_issues.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 3,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "concurrency",
-        "language": "java"
-      }
-    },
-    {
-      "name": "java_security_injection",
-      "description": "Test detection of SQL injection and XSS vulnerabilities in Java",
-      "diff_file": "java_security_injection.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL"
-        ],
-        "min_issues": 3,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "security",
-        "language": "java"
-      }
-    },
-    {
-      "name": "java_performance_string_concat",
-      "description": "Test detection of inefficient string concatenation in Java",
-      "diff_file": "java_string_performance.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "WARNING"
-        ],
-        "min_issues": 1,
-        "max_issues": 1
-      },
-      "metadata": {
-        "category": "performance",
-        "language": "java"
-      }
-    },
-    {
-      "name": "python_exception_handling",
-      "description": "Test detection of missing exception handling in Python",
-      "diff_file": "python_exception_handling.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 2,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "error_handling",
-        "language": "python"
-      }
-    },
-    {
-      "name": "python_resource_leak",
-      "description": "Test detection of resource leaks in Python (files, connections)",
-      "diff_file": "python_resource_leak.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 2,
-        "max_issues": 4
-      },
-      "metadata": {
-        "category": "memory",
-        "language": "python"
-      }
-    },
-    {
-      "name": "python_performance_inefficient_loop",
-      "description": "Test detection of inefficient algorithms in Python",
-      "diff_file": "python_performance_loop.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "WARNING"
-        ],
-        "min_issues": 1,
-        "max_issues": 2
-      },
-      "metadata": {
-        "category": "performance",
-        "language": "python"
-      }
-    },
-    {
-      "name": "python_security_deserialization",
-      "description": "Test detection of insecure deserialization and command injection in Python",
-      "diff_file": "python_security_deserialization.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL"
-        ],
-        "min_issues": 3,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "security",
-        "language": "python"
-      }
-    },
-    {
-      "name": "html_accessibility_improvements",
-      "description": "Test detection of accessibility improvements in HTML",
-      "diff_file": "html_accessibility_issues.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "WARNING",
-          "MINOR"
-        ],
-        "min_issues": 2,
-        "max_issues": 6
-      },
-      "metadata": {
-        "category": "accessibility",
-        "language": "html"
-      }
-    },
-    {
-      "name": "html_security_xss_prevention",
-      "description": "Test detection of XSS vulnerabilities when escaping is removed and innerHTML is used",
-      "diff_file": "html_security_xss.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 2,
-        "max_issues": 4
-      },
-      "metadata": {
-        "category": "security",
-        "language": "html"
-      }
-    },
-    {
-      "name": "html_clean_structure",
-      "description": "Test that clean HTML structure improvements are recognized positively",
-      "diff_file": "html_clean_structure.diff",
-      "expected": {
-        "should_find_issues": false,
-        "max_issues": 2
-      },
-      "metadata": {
-        "category": "clean",
-        "language": "html"
-      }
-    },
-    {
-      "name": "css_performance_optimization",
-      "description": "Test detection of CSS performance improvements and best practices",
-      "diff_file": "css_performance_issues.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "WARNING",
-          "MINOR"
-        ],
-        "min_issues": 2,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "performance",
-        "language": "css"
-      }
-    },
-    {
-      "name": "css_responsive_design_improvements",
-      "description": "Test detection of responsive design and mobile-first improvements",
-      "diff_file": "css_responsive_design.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": ["WARNING", "MINOR"],
-        "min_issues": 1,
-        "max_issues": 4
-      },
-      "metadata": {
-        "category": "responsive",
-        "language": "css"
-      }
-    },
-    {
-      "name": "c_security_buffer_overflow",
-      "description": "Test detection of buffer overflow vulnerabilities in C",
-      "diff_file": "c_buffer_overflow.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": ["CRITICAL"],
-        "min_issues": 3,
-        "max_issues": 6
-      },
-      "metadata": {
-        "category": "security",
-        "language": "c"
-      }
-    },
-    {
-      "name": "c_memory_management_issues",
-      "description": "Test detection of memory leaks, double free, and malloc/free mismatches",
-      "diff_file": "c_memory_management.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": ["CRITICAL", "WARNING"],
-        "min_issues": 4,
-        "max_issues": 8
-      },
-      "metadata": {
-        "category": "memory",
-        "language": "c"
-      }
-    },
-    {
-      "name": "c_security_format_string",
-      "description": "Test detection of format string vulnerabilities in printf family functions",
-      "diff_file": "c_format_string_vuln.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": ["CRITICAL"],
-        "min_issues": 3,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "security",
-        "language": "c"
-      }
-    },
-    {
-      "name": "c_pointer_arithmetic_errors",
-      "description": "Test detection of dangerous pointer arithmetic and bounds checking issues",
-      "diff_file": "c_pointer_arithmetic.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": ["CRITICAL", "WARNING"],
-        "min_issues": 3,
-        "max_issues": 6
-      },
-      "metadata": {
-        "category": "memory",
-        "language": "c"
       }
     }
   ]

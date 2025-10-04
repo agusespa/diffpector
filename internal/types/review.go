@@ -7,3 +7,9 @@ type Issue struct {
 	EndLine     int    `json:"end_line"`
 	Description string `json:"description"`
 }
+
+type PromptVariant struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Template    string `json:"template"`
+}
