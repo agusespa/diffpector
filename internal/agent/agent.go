@@ -9,25 +9,22 @@ import (
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
 	"github.com/agusespa/diffpector/internal/utils"
-	"github.com/agusespa/diffpector/pkg/config"
 	"github.com/agusespa/diffpector/pkg/spinner"
 )
 
 type CodeReviewAgent struct {
 	llmProvider    llm.Provider
-	toolRegistry   *tools.Registry
-	config         *config.Config
 	promptVariant  string
 	parserRegistry *tools.ParserRegistry
+	toolRegistry   *tools.ToolRegistry
 }
 
-func NewCodeReviewAgent(provider llm.Provider, registry *tools.Registry, cfg *config.Config, parserRegistry *tools.ParserRegistry, promptVariant string) *CodeReviewAgent {
+func NewCodeReviewAgent(provider llm.Provider, parserRegistry *tools.ParserRegistry, registry *tools.ToolRegistry, promptVariant string) *CodeReviewAgent {
 	return &CodeReviewAgent{
 		llmProvider:    provider,
-		toolRegistry:   registry,
-		config:         cfg,
 		promptVariant:  promptVariant,
 		parserRegistry: parserRegistry,
+		toolRegistry:   registry,
 	}
 }
 
@@ -92,6 +89,7 @@ func (a *CodeReviewAgent) ValidateAndDetectLanguage(changedFiles []string) (stri
 
 	return primaryLanguage, nil
 }
+
 func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, primaryLanguage string) error {
 	_, err := a.ReviewChangesWithResult(diffMap, primaryLanguage, true)
 	return err
@@ -162,7 +160,7 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}
 
-	fmt.Println("\n Prompt:\n", prompt)
+	// fmt.Println("\n Prompt:\n", prompt)
 
 	spinner := spinner.New("Analyzing changes...")
 	spinner.Start()

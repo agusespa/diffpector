@@ -79,7 +79,7 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 				key := fmt.Sprintf("decl:%s:%d-%d", filePath, s.StartLine, s.EndLine)
 				if !seen[key] {
 					seen[key] = true
-					contextBuilder.WriteString(fmt.Sprintf("Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
+					contextBuilder.WriteString(fmt.Sprintf(">>>>>> Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
 					contextBuilder.WriteString(snippet)
 					contextBuilder.WriteString("\n")
 				}
@@ -89,7 +89,7 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 				key := fmt.Sprintf("usage:%s:%d-%d", filePath, s.StartLine, s.EndLine)
 				if !seen[key] {
 					seen[key] = true
-					contextBuilder.WriteString(fmt.Sprintf("Usage in %s (line %d):\n", filePath, s.StartLine))
+					contextBuilder.WriteString(fmt.Sprintf(">>>>>> Usage in %s (line %d):\n", filePath, s.StartLine))
 					contextBuilder.WriteString(snippet)
 					contextBuilder.WriteString("\n")
 				}

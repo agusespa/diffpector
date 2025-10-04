@@ -2,8 +2,10 @@ package llm
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -31,17 +33,6 @@ func TestOllamaProvider_GetModel(t *testing.T) {
 
 	if provider.GetModel() != model {
 		t.Errorf("Expected model %s, got %s", model, provider.GetModel())
-	}
-}
-
-func TestOllamaProvider_SetModel(t *testing.T) {
-	provider := NewOllamaProvider("http://localhost:11434", "initial-model")
-	newModel := "new-model"
-
-	provider.SetModel(newModel)
-
-	if provider.GetModel() != newModel {
-		t.Errorf("Expected model %s, got %s", newModel, provider.GetModel())
 	}
 }
 
@@ -77,7 +68,10 @@ func TestOllamaProvider_Generate_Success(t *testing.T) {
 			Done:     true,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Internal server error during response encoding", http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -104,7 +98,7 @@ func TestOllamaProvider_Generate_HTTPError(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for HTTP 500 response")
 	}
-	if !contains(err.Error(), "ollama request failed with status: 500") {
+	if !strings.Contains(err.Error(), "ollama request failed with status: 500") {
 		t.Errorf("Expected status error, got: %v", err)
 	}
 }
@@ -112,7 +106,10 @@ func TestOllamaProvider_Generate_HTTPError(t *testing.T) {
 func TestOllamaProvider_Generate_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("invalid json"))
+		if _, err := w.Write([]byte("invalid json")); err != nil {
+			fmt.Printf("Error writing response body: %v", err)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -122,36 +119,22 @@ func TestOllamaProvider_Generate_InvalidJSON(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for invalid JSON response")
 	}
-	if !contains(err.Error(), "failed to unmarshal response") {
+	if !strings.Contains(err.Error(), "failed to unmarshal response") {
 		t.Errorf("Expected unmarshal error, got: %v", err)
 	}
 }
 
 func TestOllamaProvider_Generate_NetworkError(t *testing.T) {
 	provider := NewOllamaProvider("http://invalid-url-that-does-not-exist:12345", "test-model")
-	
-	// Set a short timeout for the test to avoid waiting too long
+
 	provider.client.Timeout = 100 * time.Millisecond
-	
+
 	_, err := provider.Generate("test prompt")
 
 	if err == nil {
 		t.Error("Expected error for network failure")
 	}
-	if !contains(err.Error(), "failed to make request") {
+	if !strings.Contains(err.Error(), "failed to make request") {
 		t.Errorf("Expected network error, got: %v", err)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			func() bool {
-				for i := 1; i <= len(s)-len(substr); i++ {
-					if s[i:i+len(substr)] == substr {
-						return true
-					}
-				}
-				return false
-			}())))
 }

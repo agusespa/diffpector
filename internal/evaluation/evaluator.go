@@ -21,7 +21,7 @@ type Evaluator struct {
 	envBuilder     *TestEnvironmentBuilder
 	statsCalc      *StatisticsCalculator
 	resultsMgr     *ResultsManager
-	toolRegistry   *tools.Registry
+	toolRegistry   *tools.ToolRegistry
 	parserRegistry *tools.ParserRegistry
 }
 
@@ -32,7 +32,7 @@ func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
 	}
 
 	parserRegistry := tools.NewParserRegistry()
-	toolRegistry := tools.NewRegistry()
+	toolRegistry := tools.NewToolRegistry()
 
 	toolRegistry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(".", parserRegistry))
 

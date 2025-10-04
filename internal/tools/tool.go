@@ -16,31 +16,26 @@ const (
 	ToolNameSymbolContext ToolName = "symbol_context"
 	ToolNameWriteFile     ToolName = "write_file"
 	ToolNameGitGrep       ToolName = "git_grep"
-	ToolNameAppendFile    ToolName = "append_file"
 )
 
-type Registry struct {
+type ToolRegistry struct {
 	tools map[ToolName]Tool
 }
 
-func NewRegistry() *Registry {
-	return &Registry{
+func NewToolRegistry() *ToolRegistry {
+	return &ToolRegistry{
 		tools: make(map[ToolName]Tool),
 	}
 }
 
-func (r *Registry) Register(name ToolName, tool Tool) {
+func (r *ToolRegistry) Register(name ToolName, tool Tool) {
 	r.tools[name] = tool
 }
 
-func (r *Registry) Get(name ToolName) Tool {
+func (r *ToolRegistry) Get(name ToolName) Tool {
 	tool, exists := r.tools[name]
 	if !exists {
 		panic(fmt.Sprintf("BUG: Requested tool '%s' not found in ToolRegistry", name))
 	}
 	return tool
-}
-
-func (r *Registry) List() map[ToolName]Tool {
-	return r.tools
 }

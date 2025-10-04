@@ -49,7 +49,11 @@ func (p *OllamaProvider) Generate(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("Error closing response body: %v", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ollama request failed with status: %d", resp.StatusCode)
@@ -70,8 +74,4 @@ func (p *OllamaProvider) Generate(prompt string) (string, error) {
 
 func (p *OllamaProvider) GetModel() string {
 	return p.model
-}
-
-func (p *OllamaProvider) SetModel(model string) {
-	p.model = model
 }

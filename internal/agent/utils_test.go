@@ -73,7 +73,6 @@ func TestNotifyUserIfReportNotIgnored(t *testing.T) {
 				t.Errorf("Expected error '%s', but got '%s'", tt.expectedError, gotError)
 			}
 
-			// Clean up the files after the test
 			_ = os.Remove(reportFilename)
 			_ = os.Remove(gitignoreFilename)
 		})

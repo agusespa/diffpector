@@ -22,13 +22,12 @@ var ApprovedModels = []string{
 
 func ValidateModel(model string) error {
 	if slices.Contains(UnsuitableModels, model) {
-		return fmt.Errorf("model '%s' has known issues and cannot be used", model)
+		return fmt.Errorf("model '%s' is unsupported and cannot be used", model)
 	}
-	return nil
-}
 
-func WarnIfUnapproved(model string) {
 	if !slices.Contains(ApprovedModels, model) {
 		fmt.Printf("Warning: Model '%s' is not tested - you may experience unexpected results.\n\n", model)
 	}
+
+	return nil
 }

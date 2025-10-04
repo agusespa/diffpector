@@ -104,7 +104,6 @@ func runCodeReview(mode, target string) error {
 	if err := utils.ValidateModel(cfg.LLM.Model); err != nil {
 		return fmt.Errorf("model validation failed: %w", err)
 	}
-	utils.WarnIfUnapproved(cfg.LLM.Model)
 
 	providerConfig := llm.ProviderConfig{
 		Type:    llm.ProviderType(cfg.LLM.Provider),
@@ -120,15 +119,13 @@ func runCodeReview(mode, target string) error {
 	fmt.Printf("Using %s API with %s model\n\n", cfg.LLM.Provider, llmProvider.GetModel())
 
 	parserRegistry := tools.NewParserRegistry()
-	toolRegistry := tools.NewRegistry()
-
+	toolRegistry := tools.NewToolRegistry()
 	rootDir := "."
 	toolsToRegister := map[tools.ToolName]tools.Tool{
 		tools.ToolNameGitDiff:       &tools.GitDiffTool{},
 		tools.ToolNameGitGrep:       &tools.GitGrepTool{},
 		tools.ToolNameWriteFile:     &tools.WriteFileTool{},
 		tools.ToolNameReadFile:      &tools.ReadFileTool{},
-		tools.ToolNameAppendFile:    &tools.AppendFileTool{},
 		tools.ToolNameSymbolContext: tools.NewSymbolContextTool(rootDir, parserRegistry),
 	}
 
@@ -136,7 +133,7 @@ func runCodeReview(mode, target string) error {
 		toolRegistry.Register(name, tool)
 	}
 
-	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, toolRegistry, cfg, parserRegistry, prompts.DEFAULT_PROMPT)
+	codeReviewAgent := agent.NewCodeReviewAgent(llmProvider, parserRegistry, toolRegistry, prompts.DEFAULT_PROMPT)
 
 	switch mode {
 	case "diff":

@@ -27,10 +27,6 @@ func (m *mockProvider) Generate(prompt string) (string, error) {
 	return m.response, nil
 }
 
-func (m *mockProvider) SetModel(model string) {
-	// Mock implementation
-}
-
 func TestNewEvaluator(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "test-eval-")
 	if err != nil {
