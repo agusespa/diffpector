@@ -18,11 +18,10 @@ type EvaluationSuite struct {
 }
 
 type TestCase struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	DiffFile    string            `json:"diff_file,omitempty"`
-	Expected    ExpectedResults   `json:"expected"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	DiffFile    string          `json:"diff_file,omitempty"`
+	Expected    ExpectedResults `json:"expected"`
 }
 
 type ExpectedResults struct {

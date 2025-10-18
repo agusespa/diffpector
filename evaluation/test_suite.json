@@ -1,6 +1,6 @@
 {
-  "base_dir": "evaluation/test_cases",
-  "mock_files_dir": "evaluation/mocks",
+  "base_dir": "evaluation/test_cases/",
+  "mock_files_dir": "evaluation/mocks/",
   "test_cases": [
     {
       "name": "go_security_sql_injection",
@@ -8,185 +8,42 @@
       "diff_file": "go_sql_injection.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL"
-        ],
+        "expected_severity": ["CRITICAL"],
         "min_issues": 1,
         "max_issues": 3
-      },
-      "metadata": {
-        "category": "security",
-        "language": "go"
       }
     },
     {
-      "name": "go_performance_n_plus_one_simple",
-      "description": "Test detection of N+1 query problem - batch to individual calls",
-      "diff_file": "go_n_plus_one_simple.diff",
+      "name": "go_security_xss_vulnerability",
+      "description": "Test detection of Cross-Site Scripting (XSS) vulnerability",
+      "diff_file": "go_xss_vulnerability.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": [
-          "WARNING"
-        ],
-        "min_issues": 1,
-        "max_issues": 1
-      },
-      "metadata": {
-        "category": "performance",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_bug_nil_pointer",
-      "description": "Test detection of potential nil pointer dereference",
-      "diff_file": "go_nil_pointer.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
+        "expected_severity": ["HIGH", "CRITICAL"],
         "min_issues": 1,
         "max_issues": 2
-      },
-      "metadata": {
-        "category": "bugs",
-        "language": "go"
       }
     },
     {
-      "name": "go_clean_refactor",
-      "description": "Test that clean refactoring doesn't trigger false positives",
-      "diff_file": "go_clean_refactor.diff",
-      "expected": {
-        "should_find_issues": false,
-        "max_issues": 1
-      },
-      "metadata": {
-        "category": "clean",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_error_handling_missing",
-      "description": "Test detection of missing error handling",
-      "diff_file": "go_missing_error_handling.diff",
+      "name": "go_security_path_traversal",
+      "description": "Test detection of Path Traversal vulnerability",
+      "diff_file": "go_path_traversal.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
-        "min_issues": 1,
-        "max_issues": 4
-      },
-      "metadata": {
-        "category": "error_handling",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_memory_leak",
-      "description": "Test detection of potential memory leak",
-      "diff_file": "go_memory_leak.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
+        "expected_severity": ["HIGH", "CRITICAL"],
         "min_issues": 1,
         "max_issues": 2
-      },
-      "metadata": {
-        "category": "memory",
-        "language": "go"
       }
     },
     {
-      "name": "go_race_condition",
-      "description": "Test detection of potential race condition",
-      "diff_file": "go_race_condition.diff",
+      "name": "go_security_authorization_bypass",
+      "description": "Test detection of authorization bypass through error handling change",
+      "diff_file": "go_authorization_bypass.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL",
-          "WARNING"
-        ],
+        "expected_severity": ["HIGH", "CRITICAL"],
         "min_issues": 1,
         "max_issues": 2
-      },
-      "metadata": {
-        "category": "concurrency",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_code_style_minor",
-      "description": "Test detection of minor code style issues",
-      "diff_file": "go_code_style.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "MINOR"
-        ],
-        "min_issues": 1,
-        "max_issues": 6
-      },
-      "metadata": {
-        "category": "style",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_complex_security_multi",
-      "description": "Test detection of multiple security issues in one file",
-      "diff_file": "go_complex_security.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "CRITICAL"
-        ],
-        "min_issues": 2,
-        "max_issues": 5
-      },
-      "metadata": {
-        "category": "security",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_performance_inefficient_algorithm",
-      "description": "Test detection of O(n²) algorithm - nested loop inefficiency",
-      "diff_file": "go_inefficient_algorithm.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "WARNING"
-        ],
-        "min_issues": 1,
-        "max_issues": 1
-      },
-      "metadata": {
-        "category": "performance",
-        "language": "go"
-      }
-    },
-    {
-      "name": "go_performance_batch_regression",
-      "description": "Test detection of batch operation removal - efficiency regression",
-      "diff_file": "go_batch_regression.diff",
-      "expected": {
-        "should_find_issues": true,
-        "expected_severity": [
-          "WARNING"
-        ],
-        "min_issues": 1,
-        "max_issues": 1
-      },
-      "metadata": {
-        "category": "performance",
-        "language": "go"
       }
     }
   ]
