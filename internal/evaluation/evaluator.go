@@ -2,6 +2,9 @@ package evaluation
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/agusespa/diffpector/internal/agent"
@@ -9,6 +12,7 @@ import (
 	"github.com/agusespa/diffpector/internal/tools"
 	"github.com/agusespa/diffpector/internal/types"
 	"github.com/agusespa/diffpector/internal/utils"
+	"github.com/sourcegraph/go-diff/diff"
 )
 
 type EvaluationConfig = types.EvaluationConfig
@@ -17,7 +21,6 @@ type TestCaseResult = types.TestCaseResult
 
 type Evaluator struct {
 	suite          *types.EvaluationSuite
-	envBuilder     *TestEnvironmentBuilder
 	statsCalc      *StatisticsCalculator
 	resultsMgr     *ResultsManager
 	toolRegistry   *tools.ToolRegistry
@@ -33,11 +36,10 @@ func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
 	parserRegistry := tools.NewParserRegistry()
 	toolRegistry := tools.NewToolRegistry()
 
-	toolRegistry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(".", parserRegistry))
+	toolRegistry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(suite.MockFilesDir, parserRegistry))
 
 	return &Evaluator{
 		suite:          suite,
-		envBuilder:     NewTestEnvironmentBuilder(suite.BaseDir, suite.MockFilesDir),
 		statsCalc:      NewStatisticsCalculator(),
 		resultsMgr:     NewResultsManager(resultsDir),
 		toolRegistry:   toolRegistry,
@@ -129,25 +131,63 @@ func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVa
 func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider, promptVariant string) (*TestCaseResult, error) {
 	startTime := time.Now()
 
-	env, err := e.envBuilder.CreateTestEnvironment(testCase)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create test environment: %w", err)
-	}
-
-	// Create agent with the test provider and prompt variant
 	agent := e.createTestAgent(provider, promptVariant)
-	diffMap, err := e.createDiffMap(env)
+
+	diffPath := filepath.Join(e.suite.BaseDir, testCase.DiffFile)
+	diffContent, err := os.ReadFile(diffPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create diff map: %w", err)
+		return nil, fmt.Errorf("failed to read diff file: %w", err)
 	}
 
-	// Use the complete agent review process (same as main app) but get the result
-	review, err := agent.ReviewChangesWithResult(diffMap, "", false)
+	fileDiffs, err := diff.ParseMultiFileDiff([]byte(diffContent))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse diff: %w", err)
+	}
+
+	diffMap := make(map[string]types.DiffData)
+	for _, fd := range fileDiffs {
+		name := fd.NewName
+		if name == "/dev/null" {
+			name = fd.OrigName
+		}
+		name = stripGitPrefix(name)
+
+		diffContentBytes, err := diff.PrintFileDiff(fd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to print diff for file %s: %w", name, err)
+		}
+
+		absolutePath := name
+		if !filepath.IsAbs(name) {
+			var err error
+			absolutePath, err = filepath.Abs(name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get absolute path for %s: %w", name, err)
+			}
+		}
+
+		diffData := types.DiffData{
+			AbsolutePath: absolutePath,
+			Diff:         string(diffContentBytes),
+		}
+		diffMap[name] = diffData
+	}
+
+	changedFilesPaths := make([]string, 0, len(diffMap))
+	for fileName := range diffMap {
+		changedFilesPaths = append(changedFilesPaths, fileName)
+	}
+
+	primaryLanguage, err := agent.ValidateAndDetectLanguage(changedFilesPaths)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect language: %w", err)
+	}
+
+	review, err := agent.ReviewChangesWithResult(diffMap, primaryLanguage, false)
 	if err != nil {
 		return nil, fmt.Errorf("agent review failed: %w", err)
 	}
 
-	// Use the shared parsing logic
 	issues, err := utils.ParseIssuesFromResponse(review)
 	if err != nil {
 		// Check if this is a format violation (model didn't follow instructions)
@@ -184,19 +224,11 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 	}, nil
 }
 
-func (e *Evaluator) createDiffMap(env *types.TestEnvironment) (map[string]types.DiffData, error) {
-	diffMap := make(map[string]types.DiffData)
-	filenames := e.envBuilder.ExtractFilenamesFromDiff(env.Diff)
-
-	for _, filename := range filenames {
-		absolutePath := e.envBuilder.getAbsPath(filename)
-		diffMap[filename] = types.DiffData{
-			AbsolutePath: absolutePath,
-			Diff:         env.Diff,
-		}
+func stripGitPrefix(path string) string {
+	if strings.HasPrefix(path, "a/") || strings.HasPrefix(path, "b/") {
+		return path[2:]
 	}
-
-	return diffMap, nil
+	return path
 }
 
 func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error {
