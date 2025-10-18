@@ -90,8 +90,3 @@ type TestCaseResult struct {
 	Errors        []string      `json:"errors,omitempty"`
 	Timestamp     time.Time     `json:"timestamp"`
 }
-
-type TestEnvironment struct {
-	Files map[string]string // filename -> content
-	Diff  string
-}
