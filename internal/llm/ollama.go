@@ -55,7 +55,23 @@ func (p *OllamaProvider) Generate(prompt string) (string, error) {
 		}
 	}()
 
-	fmt.Println("RES: ", resp)
+	if resp.StatusCode != http.StatusOK {
+		defer func() {
+			closeErr := resp.Body.Close()
+			if closeErr != nil {
+				err = fmt.Errorf("failed to cleanly close response body: %w", closeErr)
+			}
+		}()
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("ollama request failed with status: %d, could not read body: %w", resp.StatusCode, err)
+		}
+
+		errorBody := string(bodyBytes)
+
+		return "", fmt.Errorf("ollama request failed with status: %d. Details: %s", resp.StatusCode, errorBody)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ollama request failed with status: %d", resp.StatusCode)
