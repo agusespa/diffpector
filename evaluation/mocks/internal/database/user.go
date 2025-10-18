@@ -4,28 +4,39 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 )
 
 type User struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID    int
+	Email string
+	Name  string
+	Bio   string
 }
 
-func GetUser(db *sql.DB, userID int) (*User, error) {
-	query := "SELECT id, name, email FROM users WHERE id = ?"
-	row := db.QueryRow(query, userID)
+type Database struct {
+	conn *sql.DB
+}
 
-	var user User
-	err := row.Scan(&user.ID, &user.Name, &user.Email)
+func NewDatabase(conn *sql.DB) *Database {
+	return &Database{conn: conn}
+}
+
+func (db *Database) SearchUsers(name string) ([]*User, error) {
+	query := fmt.Sprintf("SELECT id, email, name FROM users WHERE name = '%s'", name)
+	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
-}
+	defer rows.Close()
 
-func CreateUser(db *sql.DB, name, email string) error {
-	query := "INSERT INTO users (name, email) VALUES (?, ?)"
-	_, err := db.Exec(query, name, email)
-	return err
+	var users []*User
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name); err != nil {
+			return nil, err
+		}
+		users = append(users, &user)
+	}
+	return users, nil
 }

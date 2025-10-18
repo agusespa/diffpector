@@ -1,25 +1,28 @@
-diff --git a/internal/database/user.go b/internal/database/user.go
+diff --git a/evaluation/mocks/internal/database/user.go b/evaluation/mocks/internal/database/user.go
 index 1234567..abcdefg 100644
---- a/internal/database/user.go
-+++ b/internal/database/user.go
-@@ -15,8 +15,8 @@ type User struct {
- }
+--- a/evaluation/mocks/internal/database/user.go
++++ b/evaluation/mocks/internal/database/user.go
+@@ -33,3 +33,21 @@ type Database struct {
  
- func (db *Database) GetUserByEmail(email string) (*User, error) {
--	query := "SELECT id, email, name FROM users WHERE email = ?"
--	row := db.conn.QueryRow(query, email)
-+	query := fmt.Sprintf("SELECT id, email, name FROM users WHERE email = '%s'", email)
-+	row := db.conn.QueryRow(query)
- 	
- 	var user User
- 	err := row.Scan(&user.ID, &user.Email, &user.Name)
-@@ -28,8 +28,8 @@ func (db *Database) GetUserByEmail(email string) (*User, error) {
+ func NewDatabase(conn *sql.DB) *Database {
+ 	return &Database{conn: conn}
  }
- 
- func (db *Database) DeleteUser(userID string) error {
--	query := "DELETE FROM users WHERE id = ?"
--	_, err := db.conn.Exec(query, userID)
-+	query := fmt.Sprintf("DELETE FROM users WHERE id = %s", userID)
-+	_, err := db.conn.Exec(query)
- 	return err
- }
++
++func (db *Database) SearchUsers(name string) ([]*User, error) {
++	query := fmt.Sprintf("SELECT id, email, name FROM users WHERE name = '%s'", name)
++	rows, err := db.conn.Query(query)
++	if err != nil {
++		return nil, err
++	}
++	defer rows.Close()
++
++	var users []*User
++	for rows.Next() {
++		var user User
++		if err := rows.Scan(&user.ID, &user.Email, &user.Name); err != nil {
++			return nil, err
++		}
++		users = append(users, &user)
++	}
++	return users, nil
++}

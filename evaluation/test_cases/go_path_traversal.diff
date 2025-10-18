@@ -1,0 +1,48 @@
+diff --git a/evaluation/mocks/internal/handler/file.go b/evaluation/mocks/internal/handler/file.go
+index 1234567..abcdefg 100644
+--- a/evaluation/mocks/internal/handler/file.go
++++ b/evaluation/mocks/internal/handler/file.go
+@@ -3,6 +3,7 @@ package handler
+ 
+ import (
+ 	"fmt"
+ 	"net/http"
+ 	"os"
+ 	"path/filepath"
+@@ -28,6 +29,11 @@ func (h *FileHandler) ServeFile(w http.ResponseWriter, r *http.Request) {
+ 		return
+ 	}
+ 
++	// Validate filename format
++	if err := h.validateFilename(filename); err != nil {
++		http.Error(w, err.Error(), http.StatusBadRequest)
++		return
++	}
++
+ 	fullPath := filepath.Join(h.uploadDir, filename)
+ 	
+ 	// Check if file exists
+@@ -34,6 +39,23 @@ func (h *FileHandler) ServeFile(w http.ResponseWriter, r *http.Request) {
+ 
+ 	http.ServeFile(w, r, fullPath)
+ }
++
++func (h *FileHandler) validateFilename(filename string) error {
++	// Check for empty filename
++	if strings.TrimSpace(filename) == "" {
++		return fmt.Errorf("filename cannot be empty")
++	}
++	
++	// Check for invalid characters
++	invalidChars := []string{"<", ">", ":", "\"", "|", "?", "*"}
++	for _, char := range invalidChars {
++		if strings.Contains(filename, char) {
++			return fmt.Errorf("filename contains invalid character: %s", char)
++		}
++	}
++	
++	return nil
++}
+ 
+ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
+ 	if r.Method != http.MethodPost {
