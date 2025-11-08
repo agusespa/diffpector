@@ -87,18 +87,26 @@ Ask: "Does this change produce the SAME OUTPUT for the SAME INPUT?"
 If YES → This is clean refactoring → RESPOND WITH "APPROVED"
 
 STEP 3 - DETECT REAL ISSUES:
-CRITICAL:
-- Security vulnerabilities (SQL injection, exposed credentials, authentication bypass)
-- Memory safety issues (buffer overflows, resource leaks)
-- Logic errors causing crashes or data corruption
-- Concurrency issues (race conditions, removed synchronization)
+CRITICAL (Only if change INTRODUCES the problem):
+- SQL injection: Replaced parameterized query with string concatenation
+- Authentication bypass: Removed authentication check
+- Exposed secrets: Added hardcoded credentials or API keys
+- Data corruption: Logic error causing incorrect results
+- Crash risk: Removed nil/bounds checks causing panics
 WARNING:
-- Performance problems (N+1 queries, inefficient algorithms)
-- Missing error handling for operations that can fail
-- Resource management issues (unclosed connections, files)
-- Breaking API changes
+- Missing error handling: Added code that can fail without checking errors
+- Resource leaks: Opened connections/files without closing
+- Performance regression: N+1 queries or inefficient algorithms
+- Breaking API changes: Modified public interfaces
 MINOR:
-- Significant readability problems
+- Readability problems impacting maintainability
+
+DO NOT FLAG:
+- Existing error handling (not a change)
+- Internal functions with proper error propagation
+- Refactoring maintaining same behavior
+- Removed comments, TODOs, or test instructions
+- Changes to logging or debug code
 
 === RESPONSE FORMAT ===
 
@@ -112,14 +120,16 @@ FORMAT 2 - Issues found:
     "file_path": "internal/database/user.go",
     "start_line": 18,
     "end_line": 19,
-    "description": "Replaced parameterized SQL query with fmt.Sprintf(), creating SQL injection vulnerability"
+    "description": "Replaced parameterized SQL query with fmt.Sprintf(), creating SQL injection vulnerability",
+    "code_snippet": "query := fmt.Sprintf(\"SELECT * FROM users WHERE name = '%s'\", name)"
   }
 ]
 
 CRITICAL RULES:
 - Use EXACT file path from diff header (e.g., "internal/database/user.go")
 - Line numbers must correspond to the changed lines in the diff
-- Severity must be: "CRITICAL", "WARNING", or "MINOR"  
+- Severity must be: "CRITICAL", "WARNING", or "MINOR"
+- Include code_snippet with the problematic code from the diff
 - No explanatory text, reasoning, or markdown formatting
 - Respond with raw JSON array or "APPROVED" only`
 
@@ -139,18 +149,26 @@ Ask: "Does this change produce the SAME OUTPUT for the SAME INPUT?"
 If YES → This is clean refactoring → RESPOND WITH "APPROVED"
 
 STEP 3 - DETECT REAL ISSUES & PROVIDE ACTIONABLE FEEDBACK:
-CRITICAL:
-- Security vulnerabilities (SQL injection, exposed credentials, authentication bypass)
-- Memory safety issues (buffer overflows, resource leaks)
-- Logic errors causing crashes or data corruption
-- Concurrency issues (race conditions, removed synchronization)
+CRITICAL (Only if change INTRODUCES the problem):
+- SQL injection: Replaced parameterized query with string concatenation
+- Authentication bypass: Removed authentication check
+- Exposed secrets: Added hardcoded credentials or API keys
+- Data corruption: Logic error causing incorrect results
+- Crash risk: Removed nil/bounds checks causing panics
 WARNING:
-- Performance problems (N+1 queries, inefficient algorithms)
-- Missing error handling for operations that can fail
-- Resource management issues (unclosed connections, files)
-- Breaking API changes
+- Missing error handling: Added code that can fail without checking errors
+- Resource leaks: Opened connections/files without closing
+- Performance regression: N+1 queries or inefficient algorithms
+- Breaking API changes: Modified public interfaces
 MINOR:
-- Significant readability problems
+- Readability problems impacting maintainability
+
+DO NOT FLAG:
+- Existing error handling (not a change)
+- Internal functions with proper error propagation
+- Refactoring maintaining same behavior
+- Removed comments, TODOs, or test instructions
+- Changes to logging or debug code
 
 === RESPONSE FORMAT ===
 
@@ -164,7 +182,8 @@ FORMAT 2 - Issues found:
     "file_path": "internal/database/user.go",
     "start_line": 18,
     "end_line": 19,
-    "description": "Replaced parameterized SQL query with fmt.Sprintf(), creating SQL injection vulnerability"
+    "description": "Replaced parameterized SQL query with fmt.Sprintf(), creating SQL injection vulnerability",
+    "code_snippet": "query := fmt.Sprintf(\"SELECT * FROM users WHERE name = '%s'\", name)"
   }
 ]
 
@@ -172,6 +191,7 @@ CRITICAL RULES:
 - Use EXACT file path from diff header (e.g., "internal/database/user.go")
 - Line numbers must correspond to the changed lines in the diff
 - Severity must be: "CRITICAL", "WARNING", or "MINOR"
+- Include code_snippet with the problematic code from the diff
 - Provide a clear and actionable suggestion for each issue.
 - No explanatory text, reasoning, or markdown formatting
 - Respond with raw JSON array or "APPROVED" only`
@@ -196,25 +216,33 @@ STEP 1: IDENTIFY ACTUAL CHANGES
 STEP 2: EVALUATE FOR ISSUES
 Scan for these issue types in order of priority:
 
-🔴 CRITICAL (Security, crashes, data loss):
-- SQL injection vulnerabilities (unparameterized queries)
-- Authentication/authorization bypass
-- Exposed credentials, API keys, or secrets
-- Buffer overflows or memory corruption
-- Logic errors causing crashes or data corruption
-- Removed error handling for critical operations
+CRITICAL (Only flag if change INTRODUCES a severe problem):
+- SQL injection: Replaced parameterized query with string concatenation
+- Authentication bypass: Removed authentication check or validation
+- Exposed secrets: Added hardcoded credentials, API keys, or tokens in code
+- Data corruption: Logic error that corrupts data or causes incorrect results
+- Crash risk: Removed nil checks, bounds checks, or error handling that prevents panics
+- Memory safety: Buffer overflow, use-after-free, or memory leak in unsafe code
 
-🟡 WARNING (Performance, reliability):
-- Performance degradation (N+1 queries, inefficient algorithms)
-- Missing error handling for operations that can fail
-- Resource leaks (unclosed connections, files, database handles)
-- Concurrency issues (race conditions, missing synchronization)
-- Breaking changes to public APIs
+WARNING (Reliability and performance issues):
+- Missing error handling: Added code that can fail but doesn't check errors
+- Resource leaks: Opened connections/files without closing them
+- Performance regression: Introduced N+1 queries or inefficient algorithms
+- Breaking changes: Modified public API signatures or behavior
+- Race conditions: Removed locks or introduced unsafe concurrent access
 
-🔵 MINOR (Code quality):
-- Significant readability problems that impact maintainability
-- Missing input validation for user-facing functions
-- Inconsistent error handling patterns
+MINOR (Code quality issues):
+- Readability: Complex logic without comments or unclear naming
+- Inconsistency: Different error handling patterns in same codebase
+- Missing validation: User input not validated (but not exploitable)
+
+IMPORTANT - DO NOT FLAG:
+- Existing error handling that's already present (not a change)
+- Internal functions with proper error propagation
+- Refactoring that maintains same behavior
+- Style preferences or subjective improvements
+- Removed comments, TODOs, or debug/test instructions
+- Changes to logging, debugging, or development-only code
 
 === RESPONSE FORMAT ===
 
@@ -228,7 +256,8 @@ If issues found:
     "file_path": "exact/path/from/diff/header.go",
     "start_line": 25,
     "end_line": 27,
-    "description": "Specific issue description with actionable fix suggestion"
+    "description": "Specific issue description with actionable fix suggestion",
+    "code_snippet": "The actual problematic code from the diff"
   }
 ]
 
@@ -238,7 +267,7 @@ Example 1 - No issues:
 APPROVED
 
 Example 2 - Single issue:
-[{"severity":"WARNING","file_path":"internal/auth/handler.go","start_line":42,"end_line":42,"description":"Missing error handling for database query - add proper error checking and return appropriate HTTP status"}]
+[{"severity":"WARNING","file_path":"internal/auth/handler.go","start_line":42,"end_line":42,"description":"Missing error handling for database query - add proper error checking and return appropriate HTTP status","code_snippet":"rows, err := db.Query(sql)"}]
 
 Example 3 - Multiple issues:
 [
@@ -247,7 +276,8 @@ Example 3 - Multiple issues:
     "file_path": "pkg/database/user.go", 
     "start_line": 18,
     "end_line": 20,
-    "description": "SQL injection vulnerability - replace fmt.Sprintf with parameterized query using database/sql placeholders"
+    "description": "SQL injection vulnerability - replace fmt.Sprintf with parameterized query using database/sql placeholders",
+    "code_snippet": "query := fmt.Sprintf(\"SELECT * FROM users WHERE id = '%s'\", userID)"
   },
   {
     "severity": "WARNING",
@@ -263,6 +293,7 @@ Example 3 - Multiple issues:
 ✅ MUST: Line numbers must match the actual changed lines in the diff
 ✅ MUST: Severity must be exactly "CRITICAL", "WARNING", or "MINOR" 
 ✅ MUST: Description must be actionable and specific
+✅ MUST: Include code_snippet with the problematic code from the diff
 ✅ MUST: Return valid JSON array or exactly "APPROVED"
 ✅ MUST: No additional text, explanations, markdown, or code blocks
 ❌ NEVER: Include reasoning, explanations, or commentary

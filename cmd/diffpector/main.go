@@ -28,7 +28,7 @@ func main() {
 
 func runMainMenu() error {
 	for {
-		fmt.Println("Welcome to Diffpector! Which mode do you want to run?")
+		fmt.Println("Which mode do you want to run?")
 		fmt.Println()
 		fmt.Println("1. DIFF MODE: Review staged changes (local Git diff)")
 		fmt.Println("2. PR MODE: Review remote branch (compare with current branch)")
@@ -50,7 +50,7 @@ func runMainMenu() error {
 			return runCodeReview("diff", "")
 		case "2":
 			fmt.Println("Branch Review")
-			fmt.Println("=============")
+			fmt.Println("-------------")
 			fmt.Println("Note: Make sure you're running from the Git repository root directory.")
 			fmt.Println("The tool will fetch the branch and compare it with your current branch.")
 			fmt.Println("Ensure your SSH keys are set up for the Git platform.")
@@ -148,7 +148,7 @@ func runCodeReview(mode, target string) error {
 
 func showHelp() {
 	fmt.Println("Diffpector Review Agent")
-	fmt.Println("=======================")
+	fmt.Println("-----------------------")
 	fmt.Println()
 	fmt.Println("AI-powered code review for staged Git changes and pull/merge requests")
 	fmt.Println()

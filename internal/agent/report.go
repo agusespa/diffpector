@@ -60,13 +60,15 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) (critical
 		reportBuilder.WriteString(fmt.Sprintf("## %s %s: %s\n", severityIcon, issue.Severity, issue.Description))
 		reportBuilder.WriteString(fmt.Sprintf("**File:** `%s`\n", issue.FilePath))
 		reportBuilder.WriteString(fmt.Sprintf("**Location:** Lines %d-%d\n", issue.StartLine, issue.EndLine))
-		reportBuilder.WriteString("**Code:**\n")
+
 		language := utils.DetectLanguageFromFilePath(issue.FilePath)
-		reportBuilder.WriteString(fmt.Sprintf("```%s\n", language))
-		for i := issue.StartLine - 1; i < issue.EndLine; i++ {
-			reportBuilder.WriteString(lines[i] + "\n")
+
+		if issue.CodeSnippet != "" {
+			reportBuilder.WriteString("**Code:**\n")
+			reportBuilder.WriteString(fmt.Sprintf("```%s\n", language))
+			reportBuilder.WriteString(issue.CodeSnippet)
+			reportBuilder.WriteString("\n```\n\n---\n\n")
 		}
-		reportBuilder.WriteString("```\n\n---\n\n")
 	}
 
 	var summary = fmt.Sprintf("\n\n**Summary:** %d critical, %d warnings, %d minor issues\n", criticalCount, warningCount, minorCount)
@@ -100,9 +102,14 @@ func (r *ReportGenerator) getSeverityIcon(severity string) string {
 
 func PrintReviewSummary(criticalCount, warningCount, minorCount int) {
 	fmt.Println("---")
+
 	if criticalCount+warningCount+minorCount > 0 {
-		fmt.Printf("⚠️ Code review didn't pass - %d critical, %d warnings and %d minor issues were found\n",
+		fmt.Printf("[✕] Code review didn't pass - %d critical, %d warnings and %d minor issues were found\n",
 			criticalCount, warningCount, minorCount)
+	} else {
+
+		fmt.Println("[✓] Code review passed - no issues found")
 	}
-	fmt.Println("💾 Detailed report saved to diffpector_report.md")
+
+	fmt.Println("Detailed report saved to diffpector_report.md")
 }

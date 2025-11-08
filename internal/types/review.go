@@ -6,6 +6,7 @@ type Issue struct {
 	StartLine   int    `json:"start_line"`
 	EndLine     int    `json:"end_line"`
 	Description string `json:"description"`
+	CodeSnippet string `json:"code_snippet,omitempty"`
 }
 
 type PromptVariant struct {

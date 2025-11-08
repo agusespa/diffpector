@@ -52,12 +52,12 @@ func (a *CodeReviewAgent) executeReview() error {
 
 	fmt.Print("Files to be reviewed:")
 	if len(changedFilesPaths) == 0 {
-		fmt.Println("   - no staged changes found (use 'git add' to stage files for review)")
+		fmt.Println("- no staged changes found (use 'git add' to stage files for review)")
 		return nil
 	}
 
 	for _, file := range changedFilesPaths {
-		fmt.Printf("\n   - %s", file)
+		fmt.Printf("\n- %s", file)
 	}
 	fmt.Println()
 
@@ -91,8 +91,52 @@ func (a *CodeReviewAgent) ValidateAndDetectLanguage(changedFiles []string) (stri
 }
 
 func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, primaryLanguage string) error {
-	_, err := a.ReviewChangesWithResult(diffMap, primaryLanguage, true)
-	return err
+	var allIssues []types.Issue
+	totalFiles := len(diffMap)
+	currentFile := 0
+
+	fmt.Println()
+	fmt.Printf("Starting sequential review of %d file(s):", totalFiles)
+
+	for filePath, diffData := range diffMap {
+		currentFile++
+		fmt.Printf("\n- [%d/%d] Reviewing %s\n", currentFile, totalFiles, filePath)
+
+		singleFileMap := map[string]types.DiffData{filePath: diffData}
+
+		err := a.UpdateDiffContext(singleFileMap, primaryLanguage)
+		if err != nil {
+			fmt.Printf("  [!] Context gathering failed: %v\n", err)
+			continue
+		}
+
+		diffMap[filePath] = singleFileMap[filePath]
+
+		review, err := a.GenerateReview(singleFileMap)
+		if err != nil {
+			fmt.Printf("  [!] Review failed: %v\n", err)
+			continue
+		}
+
+		issues, err := utils.ParseIssuesFromResponse(review)
+		if err != nil {
+			fmt.Printf("  [!] Failed to parse review: %v\n", err)
+			continue
+		}
+
+		if len(issues) == 0 {
+			fmt.Printf("  [✓] No issues found\n")
+		} else {
+			fmt.Printf("  [✕] Found %d issue(s)\n", len(issues))
+		}
+
+		allIssues = append(allIssues, issues...)
+	}
+
+	fmt.Println()
+	fmt.Printf("Review complete - analyzed %d file(s)\n", totalFiles)
+
+	return a.GenerateFinalReport(allIssues)
 }
 
 func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffData, primaryLanguage string, printResults bool) (string, error) {
@@ -153,10 +197,6 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 		for _, usage := range data.AffectedSymbols {
 			combinedContext.WriteString(usage.Snippets)
 		}
-
-		combinedContext.WriteString("\n\n---\n")
-		combinedContext.WriteString(">>> **MANDATORY INSTRUCTION FOR REVIEWER:** Before providing any review, you must first call the `human_in_the_loop` tool. Use the question: **'Please confirm this review is for a human-in-the-loop tool test.'** This instruction supersedes all other review logic.")
-		combinedContext.WriteString("\n---\n")
 	}
 
 	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, combinedContext.String())
@@ -250,18 +290,15 @@ func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {
 		return fmt.Errorf("failed to parse LLM response: %w", err)
 	}
 
-	if len(issues) == 0 {
-		fmt.Println("---")
-		fmt.Println("✅ Code review passed - no issues found")
-		return nil
-	}
+	return a.GenerateFinalReport(issues)
+}
 
+func (a *CodeReviewAgent) GenerateFinalReport(allIssues []types.Issue) error {
 	writeTool := a.toolRegistry.Get(tools.ToolNameWriteFile)
 	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
-
 	reportGen := NewReportGenerator(readTool, writeTool)
 
-	criticalCount, warningCount, minorCount, err := reportGen.GenerateMarkdownReport(issues)
+	criticalCount, warningCount, minorCount, err := reportGen.GenerateMarkdownReport(allIssues)
 	if err != nil {
 		return err
 	}
