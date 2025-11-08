@@ -160,7 +160,9 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}
 
-	// fmt.Println("\n Prompt:\n", prompt)
+	// TODO remove
+	// fmt.Println("------------Prompt:")
+	// fmt.Println(prompt)
 
 	spinner := spinner.New("Analyzing changes...")
 	spinner.Start()
