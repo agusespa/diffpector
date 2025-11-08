@@ -15,6 +15,23 @@ func (t *WriteFileTool) Description() string {
 	return "Write content to a specified file"
 }
 
+func (t *WriteFileTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"filename": map[string]any{
+				"type":        "string",
+				"description": "Path to the file to write",
+			},
+			"content": map[string]any{
+				"type":        "string",
+				"description": "Content to write to the file",
+			},
+		},
+		"required": []string{"filename", "content"},
+	}
+}
+
 func (t *WriteFileTool) Execute(args map[string]any) (any, error) {
 	filename, ok := args["filename"].(string)
 	if !ok {
@@ -42,6 +59,19 @@ func (t *ReadFileTool) Name() string {
 
 func (t *ReadFileTool) Description() string {
 	return "Read content from a specified file"
+}
+
+func (t *ReadFileTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"filename": map[string]any{
+				"type":        "string",
+				"description": "Path to the file to read",
+			},
+		},
+		"required": []string{"filename"},
+	}
 }
 
 func (t *ReadFileTool) Execute(args map[string]any) (any, error) {

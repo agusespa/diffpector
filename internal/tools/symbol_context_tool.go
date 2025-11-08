@@ -30,6 +30,23 @@ func (t *SymbolContextTool) Description() string {
 	return "Analyze code changes to find symbols and gather related context"
 }
 
+func (t *SymbolContextTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"diffData": map[string]any{
+				"type":        "object",
+				"description": "Diff data containing file path and changes",
+			},
+			"primaryLanguage": map[string]any{
+				"type":        "string",
+				"description": "Primary programming language of the changes",
+			},
+		},
+		"required": []string{"diffData", "primaryLanguage"},
+	}
+}
+
 func (t *SymbolContextTool) Execute(args map[string]any) (any, error) {
 	diffData, hasDiff := args["diffData"].(types.DiffData)
 	if !hasDiff {

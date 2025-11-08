@@ -138,3 +138,127 @@ func TestOllamaProvider_Generate_NetworkError(t *testing.T) {
 		t.Errorf("Expected network error, got: %v", err)
 	}
 }
+
+func TestOllamaProvider_ChatWithTools_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/chat" {
+			t.Errorf("Expected path /api/chat, got %s", r.URL.Path)
+		}
+
+		response := ollamaToolCallResponse{
+			Done: true,
+		}
+		response.Message.Role = "assistant"
+		response.Message.Content = "Here's the analysis"
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	provider := NewOllamaProvider(server.URL, "test-model")
+	messages := []Message{{Role: "user", Content: "test"}}
+	tools := []Tool{{
+		Type: "function",
+		Function: ToolFunction{
+			Name:        "test_tool",
+			Description: "A test tool",
+		},
+	}}
+
+	result, err := provider.ChatWithTools(messages, tools)
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if result.Content != "Here's the analysis" {
+		t.Errorf("Expected content 'Here's the analysis', got %s", result.Content)
+	}
+}
+
+func TestOllamaProvider_ChatWithTools_WithToolCalls(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := ollamaToolCallResponse{
+			Done: true,
+		}
+		response.Message.Role = "assistant"
+		response.Message.ToolCalls = []ollamaToolCall{
+			{
+				Function: struct {
+					Name      string         `json:"name"`
+					Arguments map[string]any `json:"arguments"`
+				}{
+					Name:      "analyze_diff",
+					Arguments: map[string]any{"file": "test.go"},
+				},
+			},
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	provider := NewOllamaProvider(server.URL, "test-model")
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	result, err := provider.ChatWithTools(messages, nil)
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(result.ToolCalls) != 1 {
+		t.Errorf("Expected 1 tool call, got %d", len(result.ToolCalls))
+	}
+	if result.ToolCalls[0].Name != "analyze_diff" {
+		t.Errorf("Expected tool name 'analyze_diff', got %s", result.ToolCalls[0].Name)
+	}
+}
+
+func TestOllamaProvider_ChatWithTools_JSONFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := ollamaToolCallResponse{
+			Done: true,
+		}
+		response.Message.Role = "assistant"
+		response.Message.Content = `{"name": "analyze_diff", "arguments": {"file": "test.go"}}`
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	provider := NewOllamaProvider(server.URL, "test-model")
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	result, err := provider.ChatWithTools(messages, nil)
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(result.ToolCalls) != 1 {
+		t.Errorf("Expected 1 tool call from JSON fallback, got %d", len(result.ToolCalls))
+	}
+}
+
+func TestOllamaProvider_ChatWithTools_HTTPError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("bad request"))
+	}))
+	defer server.Close()
+
+	provider := NewOllamaProvider(server.URL, "test-model")
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	_, err := provider.ChatWithTools(messages, nil)
+
+	if err == nil {
+		t.Error("Expected error for HTTP 400 response")
+	}
+	if !strings.Contains(err.Error(), "ollama request failed with status: 400") {
+		t.Errorf("Expected status error, got: %v", err)
+	}
+}

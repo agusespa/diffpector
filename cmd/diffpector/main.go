@@ -126,6 +126,7 @@ func runCodeReview(mode, target string) error {
 		tools.ToolNameGitGrep:       &tools.GitGrepTool{},
 		tools.ToolNameWriteFile:     &tools.WriteFileTool{},
 		tools.ToolNameReadFile:      &tools.ReadFileTool{},
+		tools.ToolNameHumanLoop:     &tools.HumanLoopTool{},
 		tools.ToolNameSymbolContext: tools.NewSymbolContextTool(rootDir, parserRegistry),
 	}
 

@@ -20,6 +20,13 @@ func (t *GitDiffTool) Description() string {
 	return "Get list of diff organized by file"
 }
 
+func (t *GitDiffTool) Schema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{},
+	}
+}
+
 func (t *GitDiffTool) Execute(args map[string]any) (any, error) {
 	rootCmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	repoRootBytes, err := rootCmd.Output()
@@ -80,6 +87,19 @@ func (t *GitGrepTool) Name() string {
 
 func (t *GitGrepTool) Description() string {
 	return "Search for patterns in tracked files using git grep"
+}
+
+func (t *GitGrepTool) Schema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"pattern": map[string]interface{}{
+				"type":        "string",
+				"description": "Pattern to search for in tracked files",
+			},
+		},
+		"required": []string{"pattern"},
+	}
 }
 
 func (t *GitGrepTool) Execute(args map[string]any) (any, error) {

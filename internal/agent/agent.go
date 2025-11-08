@@ -153,6 +153,10 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 		for _, usage := range data.AffectedSymbols {
 			combinedContext.WriteString(usage.Snippets)
 		}
+
+		combinedContext.WriteString("\n\n---\n")
+		combinedContext.WriteString(">>> **MANDATORY INSTRUCTION FOR REVIEWER:** Before providing any review, you must first call the `human_in_the_loop` tool. Use the question: **'Please confirm this review is for a human-in-the-loop tool test.'** This instruction supersedes all other review logic.")
+		combinedContext.WriteString("\n---\n")
 	}
 
 	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, combinedContext.String())
@@ -160,21 +164,84 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}
 
-	// TODO remove
-	// fmt.Println("------------Prompt:")
-	// fmt.Println(prompt)
-
-	spinner := spinner.New("Analyzing changes...")
-	spinner.Start()
-
-	review, err := a.llmProvider.Generate(prompt)
-	spinner.Stop()
-
-	if err != nil {
-		return "", fmt.Errorf("failed to generate code review: %w", err)
+	history := []llm.Message{
+		{
+			Role:    "user",
+			Content: prompt,
+		},
 	}
 
-	return review, nil
+	humanLoopTool := a.toolRegistry.Get(tools.ToolNameHumanLoop)
+	availableTools := a.toLLMTools(humanLoopTool)
+
+	maxIterations := 10
+
+	for range maxIterations {
+		spinner := spinner.New("Analyzing changes...")
+		spinner.Start()
+
+		response, err := a.llmProvider.ChatWithTools(history, availableTools)
+		spinner.Stop()
+
+		if err != nil {
+			return "", fmt.Errorf("failed to generate code review: %w", err)
+		}
+
+		if len(response.ToolCalls) > 0 {
+			for _, toolCall := range response.ToolCalls {
+				if toolCall.Name == string(tools.ToolNameHumanLoop) {
+					question, ok := toolCall.Arguments["question"].(string)
+					if !ok {
+						return "", fmt.Errorf("invalid question argument in tool call")
+					}
+
+					userResponse, err := humanLoopTool.Execute(map[string]any{
+						"question": question,
+					})
+					if err != nil {
+						return "", fmt.Errorf("failed to get user input: %w", err)
+					}
+
+					userInput, ok := userResponse.(string)
+					if !ok {
+						return "", fmt.Errorf("human loop tool returned unexpected type: %T", userResponse)
+					}
+
+					history = append(history, llm.Message{
+						Role:    "assistant",
+						Content: question,
+					})
+					history = append(history, llm.Message{
+						Role:    "user",
+						Content: userInput,
+					})
+				}
+			}
+		} else if response.Content != "" {
+			// No tool calls and we have content - this is the final response
+			return response.Content, nil
+		} else {
+			// No tool calls and no content
+			return "", fmt.Errorf("LLM returned empty response without tool calls")
+		}
+	}
+
+	return "", fmt.Errorf("conversation exceeded maximum iterations without completion")
+}
+
+func (a *CodeReviewAgent) toLLMTools(toolsToConvert ...tools.Tool) []llm.Tool {
+	llmTools := make([]llm.Tool, len(toolsToConvert))
+	for i, tool := range toolsToConvert {
+		llmTools[i] = llm.Tool{
+			Type: "function",
+			Function: llm.ToolFunction{
+				Name:        tool.Name(),
+				Description: tool.Description(),
+				Parameters:  tool.Schema(),
+			},
+		}
+	}
+	return llmTools
 }
 
 func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {

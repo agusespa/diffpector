@@ -181,6 +181,11 @@ const optimizedPromptTemplate = `You are a Principal Software Engineer performin
 === CODE CHANGES TO REVIEW ===
 {{.}}
 
+=== AVAILABLE TOOLS ===
+Use "human_loop" tool **ONLY** when a critical information gap prevents a conclusion:
+- **Ambiguity:** Code intent is critically unclear (business logic, security, or core functionality).
+- **Missing Context:** You require essential domain or external system knowledge.
+
 === ANALYSIS PROCESS ===
 
 STEP 1: IDENTIFY ACTUAL CHANGES
