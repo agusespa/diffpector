@@ -38,29 +38,17 @@ func NewParserRegistry() *ParserRegistry {
 	}
 	registry.RegisterParser(goParser)
 
-	// tsParser, err := NewTypeScriptParser()
-	// if err != nil {
-	// 	panic(fmt.Errorf("failed to create TypeScript parser: %w", err))
-	// }
-	// registry.RegisterParser(tsParser)
+	javaParser, err := NewJavaParser()
+	if err != nil {
+		panic(fmt.Errorf("failed to create Java parser: %w", err))
+	}
+	registry.RegisterParser(javaParser)
 
-	// javaParser, err := NewJavaParser()
-	// if err != nil {
-	// 	panic(fmt.Errorf("failed to create Java parser: %w", err))
-	// }
-	// registry.RegisterParser(javaParser)
-
-	// pythonParser, err := NewPythonParser()
-	// if err != nil {
-	// 	panic(fmt.Errorf("failed to create Python parser: %w", err))
-	// }
-	// registry.RegisterParser(pythonParser)
-
-	// cParser, err := NewCParser()
-	// if err != nil {
-	// 	panic(fmt.Errorf("failed to create C parser: %w", err))
-	// }
-	// registry.RegisterParser(cParser)
+	tsParser, err := NewTypeScriptParser()
+	if err != nil {
+		panic(fmt.Errorf("failed to create TypeScript parser: %w", err))
+	}
+	registry.RegisterParser(tsParser)
 
 	return registry
 }

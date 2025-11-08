@@ -1,0 +1,18 @@
+--- a/internal/tools/integration_tests/code_samples/typescript/services/userService.ts
++++ b/internal/tools/integration_tests/code_samples/typescript/services/userService.ts
+@@ -41,7 +41,14 @@
+         console.log(`Processing request: ${requestId}`);
+ 
+         // 4. Core logic section (this is where the change will occur)
+-        return await this.userRepository.findById(userId);
++        const user = await this.userRepository.findById(userId);
++        if (!user) {
++            this.auditLogger.log(`Failed to retrieve user ${userId}: not found`);
++            throw new Error(`User not found with ID: ${userId}`);
++        }
++
++        this.auditLogger.log(`Successfully retrieved user ${userId}`);
++        return user;
+     }
+ 
+     public async getTotalUserCount(): Promise<number> {

@@ -64,6 +64,86 @@ func TestGatherEnhancedContext(t *testing.T) {
 
 			},
 		},
+		{
+			name:     "Java method modification",
+			language: "java",
+			diffFile: filepath.Join(projectRoot, "diff/java_method_decl.diff"),
+			changedFiles: []string{
+				filepath.Join(projectRoot, "code_samples/java/service/UserService.java"),
+			},
+			validate: func(t *testing.T, result types.DiffData) {
+				assert.NotEmpty(t, result.AbsolutePath, "AbsolutePath should not be empty")
+				assert.NotEmpty(t, result.Diff, "Diff should not be empty")
+				assert.NotEmpty(t, result.DiffContext, "DiffContext should not be empty")
+
+				expectedPath := filepath.Join(projectRoot, "code_samples/java/service/UserService.java")
+				assert.Equal(t, expectedPath, result.AbsolutePath)
+
+				assert.Contains(t, result.Diff, "findById", "Diff should contain findById method call")
+				assert.Contains(t, result.Diff, "auditLogger", "Diff should contain auditLogger call")
+
+				assert.Contains(t, result.DiffContext, "public User getUser",
+					"DiffContext should contain the method signature")
+				assert.Contains(t, result.DiffContext, "findById",
+					"DiffContext should contain the method call from the changed lines")
+
+				assert.True(t, len(result.AffectedSymbols) > 0, "Should have at least one affected symbol")
+				assert.Equal(t, "getUser", result.AffectedSymbols[0].Symbol.Name, "The first affected symbol name should be 'getUser'")
+
+				getUserSymbol := result.AffectedSymbols[0]
+				assert.NotEmpty(t, getUserSymbol.Snippets, "getUser symbol should have snippets")
+				assert.Contains(t, getUserSymbol.Snippets, ">>>>> Symbol: getUser (Package: com.example.service)",
+					"Snippet should contain symbol header")
+
+				assert.True(t,
+					strings.Contains(getUserSymbol.Snippets, "Definition in"), "Snippet should contain definition information")
+
+				assert.True(t, strings.Contains(getUserSymbol.Snippets, "Usage in"), "Snippet should contain usage information")
+
+				assert.Contains(t, getUserSymbol.Snippets, "public User getUser(String userId)", "Snippet should contain the getUser method code")
+
+			},
+		},
+		{
+			name:     "TypeScript method modification",
+			language: "typescript",
+			diffFile: filepath.Join(projectRoot, "diff/typescript_method_decl.diff"),
+			changedFiles: []string{
+				filepath.Join(projectRoot, "code_samples/typescript/services/userService.ts"),
+			},
+			validate: func(t *testing.T, result types.DiffData) {
+				assert.NotEmpty(t, result.AbsolutePath, "AbsolutePath should not be empty")
+				assert.NotEmpty(t, result.Diff, "Diff should not be empty")
+				assert.NotEmpty(t, result.DiffContext, "DiffContext should not be empty")
+
+				expectedPath := filepath.Join(projectRoot, "code_samples/typescript/services/userService.ts")
+				assert.Equal(t, expectedPath, result.AbsolutePath)
+
+				assert.Contains(t, result.Diff, "findById", "Diff should contain findById method call")
+				assert.Contains(t, result.Diff, "auditLogger", "Diff should contain auditLogger call")
+
+				assert.Contains(t, result.DiffContext, "public async getUser",
+					"DiffContext should contain the method signature")
+				assert.Contains(t, result.DiffContext, "findById",
+					"DiffContext should contain the method call from the changed lines")
+
+				assert.True(t, len(result.AffectedSymbols) > 0, "Should have at least one affected symbol")
+				assert.Equal(t, "getUser", result.AffectedSymbols[0].Symbol.Name, "The first affected symbol name should be 'getUser'")
+
+				getUserSymbol := result.AffectedSymbols[0]
+				assert.NotEmpty(t, getUserSymbol.Snippets, "getUser symbol should have snippets")
+				assert.Contains(t, getUserSymbol.Snippets, ">>>>> Symbol: getUser (Package: userService)",
+					"Snippet should contain symbol header")
+
+				assert.True(t,
+					strings.Contains(getUserSymbol.Snippets, "Definition in"), "Snippet should contain definition information")
+
+				assert.True(t, strings.Contains(getUserSymbol.Snippets, "Usage in"), "Snippet should contain usage information")
+
+				assert.Contains(t, getUserSymbol.Snippets, "public async getUser(userId: string)", "Snippet should contain the getUser method code")
+
+			},
+		},
 	}
 
 	for _, tc := range testCases {

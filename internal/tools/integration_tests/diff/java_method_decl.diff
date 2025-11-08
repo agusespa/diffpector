@@ -1,0 +1,18 @@
+--- a/internal/tools/integration_tests/code_samples/java/service/UserService.java
++++ b/internal/tools/integration_tests/code_samples/java/service/UserService.java
+@@ -44,7 +44,15 @@
+         logger.info("Processing request: " + requestId);
+         
+         // 4. Core logic section (this is where the change will occur)
+-        return userRepository.findById(userId);
++        User user = userRepository.findById(userId);
++        if (user == null) {
++            auditLogger.log(String.format("Failed to retrieve user %s: not found", userId));
++            throw new UserNotFoundException("User not found with ID: " + userId);
++        }
++        
++        auditLogger.log(String.format("Successfully retrieved user %s", userId));
++        return user;
+     }
+     
+     public int getTotalUserCount() {
