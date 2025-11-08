@@ -37,6 +37,8 @@ func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
 	toolRegistry := tools.NewToolRegistry()
 
 	toolRegistry.Register(tools.ToolNameSymbolContext, tools.NewSymbolContextTool(suite.MockFilesDir, parserRegistry))
+	// Register a mock human loop tool for evaluation (returns empty response)
+	toolRegistry.Register(tools.ToolNameHumanLoop, &mockHumanLoopTool{})
 
 	return &Evaluator{
 		suite:          suite,
@@ -237,4 +239,33 @@ func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error 
 
 func (e *Evaluator) createTestAgent(provider llm.Provider, promptVariant string) *agent.CodeReviewAgent {
 	return agent.NewCodeReviewAgent(provider, e.parserRegistry, e.toolRegistry, promptVariant)
+}
+
+// mockHumanLoopTool is a mock implementation for evaluation that doesn't require user input
+type mockHumanLoopTool struct{}
+
+func (t *mockHumanLoopTool) Name() string {
+	return string(tools.ToolNameHumanLoop)
+}
+
+func (t *mockHumanLoopTool) Description() string {
+	return "Mock human loop tool for evaluation - returns empty response"
+}
+
+func (t *mockHumanLoopTool) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"question": map[string]any{
+				"type":        "string",
+				"description": "The specific question to ask the developer",
+			},
+		},
+		"required": []string{"question"},
+	}
+}
+
+func (t *mockHumanLoopTool) Execute(args map[string]any) (any, error) {
+	// For evaluation, we don't want interactive input, so return empty response
+	return "No additional context available during evaluation.", nil
 }

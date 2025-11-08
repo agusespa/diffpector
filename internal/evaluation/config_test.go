@@ -15,7 +15,9 @@ func TestLoadConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	configs := []types.EvaluationConfig{
 		{
@@ -82,7 +84,9 @@ func TestLoadConfigs_InvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	invalidFile := filepath.Join(tempDir, "invalid.json")
 	err = os.WriteFile(invalidFile, []byte("invalid json"), 0644)

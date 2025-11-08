@@ -89,11 +89,11 @@ func (t *GitGrepTool) Description() string {
 	return "Search for patterns in tracked files using git grep"
 }
 
-func (t *GitGrepTool) Schema() map[string]interface{} {
-	return map[string]interface{}{
+func (t *GitGrepTool) Schema() map[string]any {
+	return map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"pattern": map[string]interface{}{
+		"properties": map[string]any{
+			"pattern": map[string]any{
 				"type":        "string",
 				"description": "Pattern to search for in tracked files",
 			},

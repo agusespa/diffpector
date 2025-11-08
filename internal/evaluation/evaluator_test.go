@@ -3,11 +3,13 @@ package evaluation
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/agusespa/diffpector/internal/llm"
 	"github.com/agusespa/diffpector/internal/types"
 )
 
@@ -27,12 +29,24 @@ func (m *mockProvider) Generate(prompt string) (string, error) {
 	return m.response, nil
 }
 
+func (m *mockProvider) ChatWithTools(messages []llm.Message, tools []llm.Tool) (*llm.ChatResponse, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &llm.ChatResponse{
+		Content:   m.response,
+		ToolCalls: nil,
+	}, nil
+}
+
 func TestNewEvaluator(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "test-eval-")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	testSuite := &types.EvaluationSuite{
 		TestCases: []types.TestCase{
@@ -76,7 +90,9 @@ func TestNewEvaluator_InvalidSuiteFile(t *testing.T) {
 
 func TestRunSingleTest_ApprovedResponse(t *testing.T) {
 	tempDir, mockFiles := setupTestEnvironment(t)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 	provider := &mockProvider{response: "APPROVED"}
@@ -101,7 +117,9 @@ func TestRunSingleTest_ApprovedResponse(t *testing.T) {
 
 func TestRunSingleTest_JSONResponse(t *testing.T) {
 	tempDir, mockFiles := setupTestEnvironment(t)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 
@@ -142,7 +160,9 @@ func TestRunSingleTest_JSONResponse(t *testing.T) {
 
 func TestRunSingleTest_MalformedResponse(t *testing.T) {
 	tempDir, mockFiles := setupTestEnvironment(t)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 
@@ -176,7 +196,9 @@ func TestRunSingleTest_MalformedResponse(t *testing.T) {
 
 func TestRunSingleTest_FormatViolation(t *testing.T) {
 	tempDir, mockFiles := setupTestEnvironment(t)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 
@@ -214,7 +236,9 @@ func TestRunSingleTest_FormatViolation(t *testing.T) {
 
 func TestRunSingleTest_ProviderError(t *testing.T) {
 	tempDir, mockFiles := setupTestEnvironment(t)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 	provider := &mockProvider{err: errors.New("provider error")}
@@ -255,12 +279,30 @@ func setupTestEnvironment(t *testing.T) (string, string) {
 }
 
 func createTestEvaluator(t *testing.T, tempDir, mockFiles string) (*Evaluator, types.TestCase) {
+	// Create a test diff file with full path to the mock file
+	testFilePath := filepath.Join(mockFiles, "test.go")
+	diffContent := fmt.Sprintf(`--- a/%s
++++ b/%s
+@@ -1,5 +1,5 @@
+ package main
+ 
+ func main() {
+-	println("Hello, World!")
++	fmt.Println("Hello, World!")
+ }
+`, testFilePath, testFilePath)
+	diffFilePath := filepath.Join(tempDir, "test.diff")
+	err := os.WriteFile(diffFilePath, []byte(diffContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create diff file: %v", err)
+	}
+
 	testSuite := &types.EvaluationSuite{
 		TestCases: []types.TestCase{
 			{
 				Name:        "Test Case 1",
 				Description: "A simple test case",
-				DiffFile:    "",
+				DiffFile:    "test.diff",
 				Expected: types.ExpectedResults{
 					ShouldFindIssues: false,
 					MinIssues:        0,
@@ -274,7 +316,7 @@ func createTestEvaluator(t *testing.T, tempDir, mockFiles string) (*Evaluator, t
 
 	suiteFilePath := filepath.Join(tempDir, "test_suite.json")
 	suiteData, _ := json.Marshal(testSuite)
-	err := os.WriteFile(suiteFilePath, suiteData, 0644)
+	err = os.WriteFile(suiteFilePath, suiteData, 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test suite file: %v", err)
 	}
