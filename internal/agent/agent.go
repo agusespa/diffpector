@@ -97,10 +97,11 @@ func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, prima
 
 	fmt.Println()
 	fmt.Printf("Starting sequential review of %d file(s):", totalFiles)
+	fmt.Println()
 
 	for filePath, diffData := range diffMap {
 		currentFile++
-		fmt.Printf("\n- [%d/%d] Reviewing %s\n", currentFile, totalFiles, filePath)
+		fmt.Printf("- [%d/%d] Reviewing %s\n", currentFile, totalFiles, filePath)
 
 		singleFileMap := map[string]types.DiffData{filePath: diffData}
 

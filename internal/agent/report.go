@@ -101,15 +101,15 @@ func (r *ReportGenerator) getSeverityIcon(severity string) string {
 }
 
 func PrintReviewSummary(criticalCount, warningCount, minorCount int) {
-	fmt.Println("---")
-
 	if criticalCount+warningCount+minorCount > 0 {
+		fmt.Println()
 		fmt.Printf("[✕] Code review didn't pass - %d critical, %d warnings and %d minor issues were found\n",
 			criticalCount, warningCount, minorCount)
 	} else {
-
+		fmt.Println()
 		fmt.Println("[✓] Code review passed - no issues found")
 	}
 
+	fmt.Println()
 	fmt.Println("Detailed report saved to diffpector_report.md")
 }
