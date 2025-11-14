@@ -216,13 +216,14 @@ STEP 1: IDENTIFY ACTUAL CHANGES
 STEP 2: EVALUATE FOR ISSUES
 Scan for these issue types in order of priority:
 
-CRITICAL (Only flag if change INTRODUCES a severe problem):
-- SQL injection: Replaced parameterized query with string concatenation
-- Authentication bypass: Removed authentication check or validation
-- Exposed secrets: Added hardcoded credentials, API keys, or tokens in code
-- Data corruption: Logic error that corrupts data or causes incorrect results
-- Crash risk: Removed nil checks, bounds checks, or error handling that prevents panics
-- Memory safety: Buffer overflow, use-after-free, or memory leak in unsafe code
+CRITICAL (Security vulnerabilities that allow unauthorized access or data exposure):
+- SQL injection: String concatenation in queries instead of parameterized queries
+- XSS (Cross-Site Scripting): Removed output encoding/escaping for user-controlled data
+- Path traversal: Missing or incomplete path sanitization (check for .., /, \, absolute paths)
+- Authentication/Authorization bypass: Removed security checks or changed error handling to allow access
+- Exposed secrets: Hardcoded credentials, API keys, or tokens in code
+- Command injection: Unsanitized input passed to system commands
+- Incomplete security validation: Added checks that don't cover all attack vectors
 
 WARNING (Reliability and performance issues):
 - Missing error handling: Added code that can fail but doesn't check errors
@@ -230,11 +231,13 @@ WARNING (Reliability and performance issues):
 - Performance regression: Introduced N+1 queries or inefficient algorithms
 - Breaking changes: Modified public API signatures or behavior
 - Race conditions: Removed locks or introduced unsafe concurrent access
+- Data corruption: Logic error that corrupts data or causes incorrect results
+- Crash risk: Removed nil checks, bounds checks, or error handling that prevents panics
 
 MINOR (Code quality issues):
 - Readability: Complex logic without comments or unclear naming
 - Inconsistency: Different error handling patterns in same codebase
-- Missing validation: User input not validated (but not exploitable)
+- Non-security validation gaps: Input validation missing but not exploitable
 
 IMPORTANT - DO NOT FLAG:
 - Existing error handling that's already present (not a change)
@@ -243,6 +246,12 @@ IMPORTANT - DO NOT FLAG:
 - Style preferences or subjective improvements
 - Removed comments, TODOs, or debug/test instructions
 - Changes to logging, debugging, or development-only code
+
+CRITICAL ANALYSIS NOTES:
+- When security validation is ADDED, verify it's complete - partial fixes can be worse than none
+- Use precise terminology: SQL injection ≠ XSS ≠ Path traversal ≠ Command injection
+- Authorization/authentication issues are always CRITICAL or WARNING, never MINOR
+- If a change looks like it's "improving" security, double-check what attack vectors remain
 
 === RESPONSE FORMAT ===
 
@@ -284,9 +293,13 @@ Example 3 - Multiple issues:
     "file_path": "pkg/database/user.go",
     "start_line": 35,
     "end_line": 35, 
-    "description": "Missing error handling for database connection - add proper error checking and connection cleanup"
+    "description": "Missing error handling for database connection - add proper error checking and connection cleanup",
+    "code_snippet": "conn, err := db.Connect()"
   }
 ]
+
+Example 4 - Incomplete security fix:
+[{"severity":"CRITICAL","file_path":"internal/handler/file.go","start_line":42,"end_line":45,"description":"Path traversal vulnerability - filename validation checks for invalid characters but doesn't prevent directory traversal attacks using .. or / - add filepath.Clean and verify result stays within allowed directory","code_snippet":"if strings.Contains(filename, \"<\") { return err }"}]
 
 === CRITICAL FORMATTING RULES ===
 ✅ MUST: Use exact file path from diff header (e.g., "a/internal/service.go" → "internal/service.go")

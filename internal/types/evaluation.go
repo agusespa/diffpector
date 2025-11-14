@@ -61,8 +61,6 @@ type EvaluationResult struct {
 type EvaluationStats struct {
 	AverageScore       float64 `json:"average_score"`
 	ScoreStdDev        float64 `json:"score_std_dev"`
-	MinScore           float64 `json:"min_score"`
-	MaxScore           float64 `json:"max_score"`
 	AverageSuccessRate float64 `json:"average_success_rate"`
 	SuccessRateStdDev  float64 `json:"success_rate_std_dev"`
 	AverageDuration    float64 `json:"average_duration_seconds"`
@@ -70,12 +68,9 @@ type EvaluationStats struct {
 }
 
 type TestCaseStats struct {
-	TestCaseName     string  `json:"test_case_name"`
-	AverageScore     float64 `json:"average_score"`
-	ScoreStdDev      float64 `json:"score_std_dev"`
-	SuccessRate      float64 `json:"success_rate"`
-	ConsistencyScore float64 `json:"consistency_score"` // How consistent the results are
-	QualityScore     float64 `json:"quality_score"`     // Combines performance and consistency (high score + high consistency = good, low score + high consistency = bad)
+	TestCaseName string  `json:"test_case_name"`
+	AverageScore float64 `json:"average_score"`
+	ScoreStdDev  float64 `json:"score_std_dev"`
 }
 
 type TestCaseResult struct {

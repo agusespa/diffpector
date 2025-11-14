@@ -76,8 +76,8 @@ func TestNewEvaluator(t *testing.T) {
 		t.Error("Expected suite to be loaded")
 	}
 
-	if evaluator.resultsMgr == nil {
-		t.Error("Expected results manager to be initialized")
+	if evaluator.resultsDir == "" {
+		t.Error("Expected results directory to be set")
 	}
 }
 

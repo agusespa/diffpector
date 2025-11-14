@@ -21,8 +21,7 @@ type TestCaseResult = types.TestCaseResult
 
 type Evaluator struct {
 	suite          *types.EvaluationSuite
-	statsCalc      *StatisticsCalculator
-	resultsMgr     *ResultsManager
+	resultsDir     string
 	toolRegistry   *tools.ToolRegistry
 	parserRegistry *tools.ParserRegistry
 }
@@ -42,8 +41,7 @@ func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
 
 	return &Evaluator{
 		suite:          suite,
-		statsCalc:      NewStatisticsCalculator(),
-		resultsMgr:     NewResultsManager(resultsDir),
+		resultsDir:     resultsDir,
 		toolRegistry:   toolRegistry,
 		parserRegistry: parserRegistry,
 	}, nil
@@ -87,7 +85,7 @@ func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant 
 	result.EndTime = time.Now()
 	result.TotalDuration = result.EndTime.Sub(result.StartTime)
 
-	e.statsCalc.CalculateEvaluationStats(result)
+	CalculateEvaluationStats(result)
 
 	return result, nil
 }
@@ -125,7 +123,7 @@ func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVa
 
 	run.EndTime = time.Now()
 	run.TotalDuration = run.EndTime.Sub(run.StartTime)
-	e.statsCalc.CalculateRunSummary(run)
+	CalculateRunSummary(run)
 
 	return run, nil
 }
@@ -234,7 +232,7 @@ func stripGitPrefix(path string) string {
 }
 
 func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error {
-	return e.resultsMgr.SaveEvaluationResults(result)
+	return SaveEvaluationResults(e.resultsDir, result)
 }
 
 func (e *Evaluator) createTestAgent(provider llm.Provider, promptVariant string) *agent.CodeReviewAgent {
