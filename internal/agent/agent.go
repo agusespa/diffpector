@@ -105,7 +105,10 @@ func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, prima
 
 		singleFileMap := map[string]types.DiffData{filePath: diffData}
 
+		ctxSpinner := spinner.New("Gathering context...")
+		ctxSpinner.Start()
 		err := a.UpdateDiffContext(singleFileMap, primaryLanguage)
+		ctxSpinner.Stop()
 		if err != nil {
 			fmt.Printf("  [!] Context gathering failed: %v\n", err)
 			continue
@@ -141,7 +144,10 @@ func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, prima
 }
 
 func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffData, primaryLanguage string, printResults bool) (string, error) {
+	ctxSpinner := spinner.New("Gathering context...")
+	ctxSpinner.Start()
 	err := a.UpdateDiffContext(diffMap, primaryLanguage)
+	ctxSpinner.Stop()
 	if err != nil {
 		return "", fmt.Errorf("context gathering failed: %w", err)
 	}
