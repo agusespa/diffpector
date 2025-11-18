@@ -96,7 +96,7 @@ func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, prima
 	currentFile := 0
 
 	fmt.Println()
-	fmt.Printf("Starting sequential review of %d file(s):", totalFiles)
+	fmt.Printf("Starting review of %d file(s):", totalFiles)
 	fmt.Println()
 
 	for filePath, diffData := range diffMap {
@@ -105,22 +105,14 @@ func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, prima
 
 		singleFileMap := map[string]types.DiffData{filePath: diffData}
 
-		ctxSpinner := spinner.New("Gathering context...")
-		ctxSpinner.Start()
-		err := a.UpdateDiffContext(singleFileMap, primaryLanguage)
-		ctxSpinner.Stop()
-		if err != nil {
-			fmt.Printf("  [!] Context gathering failed: %v\n", err)
-			continue
-		}
-
-		diffMap[filePath] = singleFileMap[filePath]
-
-		review, err := a.GenerateReview(singleFileMap)
+		review, err := a.analyzeDiffs(singleFileMap, primaryLanguage)
 		if err != nil {
 			fmt.Printf("  [!] Review failed: %v\n", err)
 			continue
 		}
+
+		// Update the original map with the gathered context
+		diffMap[filePath] = singleFileMap[filePath]
 
 		issues, err := utils.ParseIssuesFromResponse(review)
 		if err != nil {
@@ -143,7 +135,17 @@ func (a *CodeReviewAgent) ReviewChanges(diffMap map[string]types.DiffData, prima
 	return a.GenerateFinalReport(allIssues)
 }
 
-func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffData, primaryLanguage string, printResults bool) (string, error) {
+// Minimal logging and no report for Eval Pipeline
+func (a *CodeReviewAgent) ReviewChangesWithoutReport(diffMap map[string]types.DiffData, primaryLanguage string) (string, error) {
+	review, err := a.analyzeDiffs(diffMap, primaryLanguage)
+	if err != nil {
+		return "", err
+	}
+
+	return review, nil
+}
+
+func (a *CodeReviewAgent) analyzeDiffs(diffMap map[string]types.DiffData, primaryLanguage string) (string, error) {
 	ctxSpinner := spinner.New("Gathering context...")
 	ctxSpinner.Start()
 	err := a.UpdateDiffContext(diffMap, primaryLanguage)
@@ -155,14 +157,6 @@ func (a *CodeReviewAgent) ReviewChangesWithResult(diffMap map[string]types.DiffD
 	review, err := a.GenerateReview(diffMap)
 	if err != nil {
 		return "", fmt.Errorf("generate review failed: %w", err)
-	}
-
-	// Optionally process and print results (for CLI usage)
-	if printResults {
-		err = a.ProcessAndPrintReview(review)
-		if err != nil {
-			return review, fmt.Errorf("failed to process review: %w", err)
-		}
 	}
 
 	return review, nil
@@ -289,15 +283,6 @@ func (a *CodeReviewAgent) toLLMTools(toolsToConvert ...tools.Tool) []llm.Tool {
 		}
 	}
 	return llmTools
-}
-
-func (a *CodeReviewAgent) ProcessAndPrintReview(review string) error {
-	issues, err := utils.ParseIssuesFromResponse(review)
-	if err != nil {
-		return fmt.Errorf("failed to parse LLM response: %w", err)
-	}
-
-	return a.GenerateFinalReport(issues)
 }
 
 func (a *CodeReviewAgent) GenerateFinalReport(allIssues []types.Issue) error {

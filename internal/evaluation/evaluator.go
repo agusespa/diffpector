@@ -183,7 +183,7 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 		return nil, fmt.Errorf("failed to detect language: %w", err)
 	}
 
-	review, err := agent.ReviewChangesWithResult(diffMap, primaryLanguage, false)
+	review, err := agent.ReviewChangesWithoutReport(diffMap, primaryLanguage)
 	if err != nil {
 		return nil, fmt.Errorf("agent review failed: %w", err)
 	}
