@@ -290,12 +290,12 @@ func (a *CodeReviewAgent) GenerateFinalReport(allIssues []types.Issue) error {
 	readTool := a.toolRegistry.Get(tools.ToolNameReadFile)
 	reportGen := NewReportGenerator(readTool, writeTool)
 
-	criticalCount, warningCount, minorCount, err := reportGen.GenerateMarkdownReport(allIssues)
-	if err != nil {
-		return err
+	if len(allIssues) > 0 {
+		reportGen.GenerateMarkdownReport(allIssues)
+	} else {
+		fmt.Println()
+		fmt.Println("[✓] Code review passed - no issues found")
 	}
-
-	PrintReviewSummary(criticalCount, warningCount, minorCount)
 
 	return nil
 }

@@ -21,13 +21,13 @@ func NewReportGenerator(readTool, writeTool tools.Tool) *ReportGenerator {
 	}
 }
 
-func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) (criticalCount, warningCount, minorCount int, err error) {
+func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) {
 	var reportBuilder strings.Builder
 	reportBuilder.WriteString("# Code Review Report\n\n")
 
-	criticalCount = 0
-	warningCount = 0
-	minorCount = 0
+	criticalCount := 0
+	warningCount := 0
+	minorCount := 0
 
 	for _, issue := range issues {
 		result, err := r.readTool.Execute(map[string]any{"filename": issue.FilePath})
@@ -71,6 +71,10 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) (critical
 		}
 	}
 
+	fmt.Println()
+	fmt.Printf("[✕] Code review didn't pass - %d critical, %d warnings and %d minor issues were found\n",
+		criticalCount, warningCount, minorCount)
+
 	var summary = fmt.Sprintf("\n\n**Summary:** %d critical, %d warnings, %d minor issues\n", criticalCount, warningCount, minorCount)
 	reportBuilder.WriteString(summary)
 
@@ -79,12 +83,13 @@ func (r *ReportGenerator) GenerateMarkdownReport(issues []types.Issue) (critical
 		"content":  reportBuilder.String(),
 	}
 
-	_, err = r.writeTool.Execute(writeArgs)
+	_, err := r.writeTool.Execute(writeArgs)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("failed to write markdown code review: %w", err)
+		fmt.Printf("failed to write markdown code review: %s", err)
+	} else {
+		fmt.Println()
+		fmt.Println("Detailed report saved to diffpector_report.md")
 	}
-
-	return criticalCount, warningCount, minorCount, nil
 }
 
 func (r *ReportGenerator) getSeverityIcon(severity string) string {
@@ -98,18 +103,4 @@ func (r *ReportGenerator) getSeverityIcon(severity string) string {
 	default:
 		return "⚪️"
 	}
-}
-
-func PrintReviewSummary(criticalCount, warningCount, minorCount int) {
-	if criticalCount+warningCount+minorCount > 0 {
-		fmt.Println()
-		fmt.Printf("[✕] Code review didn't pass - %d critical, %d warnings and %d minor issues were found\n",
-			criticalCount, warningCount, minorCount)
-	} else {
-		fmt.Println()
-		fmt.Println("[✓] Code review passed - no issues found")
-	}
-
-	fmt.Println()
-	fmt.Println("Detailed report saved to diffpector_report.md")
 }
