@@ -109,6 +109,7 @@ func runCodeReview(mode, target string) error {
 		Type:    llm.ProviderType(cfg.LLM.Provider),
 		Model:   cfg.LLM.Model,
 		BaseURL: cfg.LLM.BaseURL,
+		APIKey:  cfg.LLM.APIKey,
 	}
 
 	llmProvider, err := llm.NewProvider(providerConfig)
@@ -116,7 +117,11 @@ func runCodeReview(mode, target string) error {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
-	fmt.Printf("Using %s API with %s model\n\n", cfg.LLM.Provider, llmProvider.GetModel())
+	modelDisplay := llmProvider.GetModel()
+	if modelDisplay == "" || modelDisplay == "llama.cpp" {
+		modelDisplay = "model loaded at server startup"
+	}
+	fmt.Printf("Using %s API with %s\n\n", cfg.LLM.Provider, modelDisplay)
 
 	parserRegistry := tools.NewParserRegistry()
 	toolRegistry := tools.NewToolRegistry()

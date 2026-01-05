@@ -16,6 +16,7 @@ import (
 )
 
 type EvaluationConfig = types.EvaluationConfig
+type ServerConfig = types.ServerConfig
 type EvaluationRun = types.EvaluationRun
 type TestCaseResult = types.TestCaseResult
 
@@ -47,7 +48,7 @@ func NewEvaluator(suitePath string, resultsDir string) (*Evaluator, error) {
 	}, nil
 }
 
-func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant string, numRuns int) (*types.EvaluationResult, error) {
+func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, serverName string, promptVariant string, numRuns int) (*types.EvaluationResult, error) {
 	if numRuns < 1 {
 		numRuns = 1
 	}
@@ -58,8 +59,8 @@ func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant 
 	}
 
 	result := &types.EvaluationResult{
-		Model:          modelConfig.Model,
-		Provider:       string(modelConfig.Type),
+		Model:          serverName,
+		Provider:       "openai",
 		PromptVariant:  promptVariant,
 		TotalRuns:      numRuns,
 		StartTime:      time.Now(),
@@ -67,14 +68,14 @@ func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant 
 		TestCaseStats:  make(map[string]types.TestCaseStats),
 	}
 
-	PrintRunHeader(modelConfig.Model, promptVariant, numRuns)
+	PrintRunHeader(serverName, promptVariant, numRuns)
 
 	for runNum := 1; runNum <= numRuns; runNum++ {
 		if numRuns > 1 {
 			PrintMultiRunProgress(runNum, numRuns)
 		}
 
-		run, err := e.runSingleEvaluation(modelConfig, promptVariant, provider, runNum)
+		run, err := e.runSingleEvaluation(serverName, "openai", promptVariant, provider, runNum)
 		if err != nil {
 			return nil, fmt.Errorf("failed to run evaluation %d: %w", runNum, err)
 		}
@@ -90,10 +91,10 @@ func (e *Evaluator) RunEvaluation(modelConfig llm.ProviderConfig, promptVariant 
 	return result, nil
 }
 
-func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVariant string, provider llm.Provider, runNum int) (*EvaluationRun, error) {
+func (e *Evaluator) runSingleEvaluation(modelIdentifier string, provider string, promptVariant string, llmProvider llm.Provider, runNum int) (*EvaluationRun, error) {
 	run := &EvaluationRun{
-		Model:         modelConfig.Model,
-		Provider:      string(modelConfig.Type),
+		Model:         modelIdentifier,
+		Provider:      provider,
 		PromptVariant: promptVariant,
 		StartTime:     time.Now(),
 		Results:       make([]TestCaseResult, 0, len(e.suite.TestCases)),
@@ -104,11 +105,11 @@ func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVa
 		prefix := fmt.Sprintf("[%d/%d] %s", i+1, len(e.suite.TestCases), testCase.Name)
 		fmt.Println(prefix)
 
-		result, err := e.runSingleTest(testCase, provider, promptVariant)
+		result, err := e.runSingleTest(testCase, llmProvider, modelIdentifier, promptVariant)
 		if err != nil {
 			result = &TestCaseResult{
 				TestCase:      testCase,
-				Model:         modelConfig.Model,
+				Model:         modelIdentifier,
 				PromptHash:    promptVariant,
 				ExecutionTime: time.Since(run.StartTime),
 				Success:       false,
@@ -128,7 +129,7 @@ func (e *Evaluator) runSingleEvaluation(modelConfig llm.ProviderConfig, promptVa
 	return run, nil
 }
 
-func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider, promptVariant string) (*TestCaseResult, error) {
+func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider, modelIdentifier string, promptVariant string) (*TestCaseResult, error) {
 	startTime := time.Now()
 
 	agent := e.createTestAgent(provider, promptVariant)
@@ -196,7 +197,7 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 			// but still return a result so we can track this metric
 			return &TestCaseResult{
 				TestCase:      testCase,
-				Model:         provider.GetModel(),
+				Model:         modelIdentifier,
 				PromptHash:    promptVariant,
 				Issues:        []types.Issue{}, // Empty since we couldn't parse
 				ExecutionTime: time.Since(startTime),
@@ -214,7 +215,7 @@ func (e *Evaluator) runSingleTest(testCase types.TestCase, provider llm.Provider
 
 	return &TestCaseResult{
 		TestCase:      testCase,
-		Model:         provider.GetModel(),
+		Model:         modelIdentifier,
 		PromptHash:    promptVariant,
 		Issues:        issues,
 		ExecutionTime: time.Since(startTime),
@@ -237,6 +238,21 @@ func (e *Evaluator) SaveEvaluationResults(result *types.EvaluationResult) error 
 
 func (e *Evaluator) createTestAgent(provider llm.Provider, promptVariant string) *agent.CodeReviewAgent {
 	return agent.NewCodeReviewAgent(provider, e.parserRegistry, e.toolRegistry, promptVariant)
+}
+
+// WarmUpModel pre-loads the model by making a simple request to avoid initial loading time in evaluation
+func WarmUpModel(modelConfig llm.ProviderConfig) error {
+	provider, err := llm.NewProvider(modelConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create provider for warm-up: %w", err)
+	}
+
+	_, err = provider.Generate("Hello, this is a warm-up request to load the model.")
+	if err != nil {
+		return fmt.Errorf("failed to warm up model: %w", err)
+	}
+
+	return nil
 }
 
 // mockHumanLoopTool is a mock implementation for evaluation that doesn't require user input

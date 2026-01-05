@@ -14,14 +14,15 @@ type LLMConfig struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
 	BaseURL  string `json:"base_url"`
+	APIKey   string `json:"api_key,omitempty"`
 }
 
 func DefaultConfig() *Config {
 	return &Config{
 		LLM: LLMConfig{
-			Provider: "ollama",
-			Model:    "qwen2.5-coder:14b",
-			BaseURL:  "http://localhost:11434",
+			Provider: "openai",
+			Model:    "",
+			BaseURL:  "http://localhost:8080",
 		},
 	}
 }

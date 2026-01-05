@@ -21,6 +21,11 @@ var ApprovedModels = []string{
 }
 
 func ValidateModel(model string) error {
+	// Empty model is allowed for llama.cpp (model is loaded at server startup)
+	if model == "" {
+		return nil
+	}
+
 	if slices.Contains(UnsuitableModels, model) {
 		return fmt.Errorf("model '%s' is unsupported and cannot be used", model)
 	}

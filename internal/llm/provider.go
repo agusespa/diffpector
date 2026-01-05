@@ -34,4 +34,4 @@ type Config struct {
 	MaxTokens   int
 }
 
-var SupportedProviders = []string{"ollama"}
+var SupportedProviders = []string{"ollama", "openai"}

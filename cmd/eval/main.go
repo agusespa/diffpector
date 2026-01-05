@@ -78,9 +78,9 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
 		}
 		fmt.Printf("--- Running Configuration: %s ---\n", config.Key)
 
-		for _, model := range config.Models {
+		for _, server := range config.Servers {
 			for _, prompt := range config.Prompts {
-				runSingleEvaluation(evaluator, config.Provider, model, prompt, config.BaseURL, config.Runs)
+				runSingleEvaluation(evaluator, server, prompt, config.Runs)
 			}
 		}
 	}
@@ -91,8 +91,7 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
 	return nil
 }
 
-func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, prompt, baseURL string, runs int) {
-	model = strings.TrimSpace(model)
+func runSingleEvaluation(evaluator *evaluation.Evaluator, server evaluation.ServerConfig, prompt string, runs int) {
 	prompt = strings.TrimSpace(prompt)
 
 	if _, err := prompts.GetPromptVariant(prompt); err != nil {
@@ -100,17 +99,24 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, provider, model, promp
 		return
 	}
 
-	fmt.Printf("=== Running evaluation: %s with %s prompt ===\n", model, prompt)
+	fmt.Printf("=== Warming up server: %s ===\n", server.Name)
 
 	llmConfig := llm.ProviderConfig{
-		Type:    llm.ProviderType(provider),
-		Model:   model,
-		BaseURL: baseURL,
+		Type:    llm.ProviderOpenAI,
+		Model:   "",
+		BaseURL: server.BaseURL,
+		APIKey:  "",
 	}
 
-	result, err := evaluator.RunEvaluation(llmConfig, prompt, runs)
+	if err := evaluation.WarmUpModel(llmConfig); err != nil {
+		fmt.Printf("Warning: failed to warm up server %s: %v\n", server.Name, err)
+	}
+
+	fmt.Printf("=== Running evaluation: %s with %s prompt ===\n", server.Name, prompt)
+
+	result, err := evaluator.RunEvaluation(llmConfig, server.Name, prompt, runs)
 	if err != nil {
-		fmt.Printf("Error running evaluation for %s/%s: %v\n", model, prompt, err)
+		fmt.Printf("Error running evaluation for %s/%s: %v\n", server.Name, prompt, err)
 		return
 	}
 

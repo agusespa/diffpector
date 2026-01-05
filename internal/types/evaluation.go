@@ -3,12 +3,15 @@ package types
 import "time"
 
 type EvaluationConfig struct {
-	Key      string   `json:"key"`
-	Provider string   `json:"provider"`
-	BaseURL  string   `json:"base_url"`
-	Models   []string `json:"models"`
-	Prompts  []string `json:"prompts"`
-	Runs     int      `json:"runs,omitempty"`
+	Key     string         `json:"key"`
+	Servers []ServerConfig `json:"servers"`
+	Prompts []string       `json:"prompts"`
+	Runs    int            `json:"runs,omitempty"`
+}
+
+type ServerConfig struct {
+	Name    string `json:"name"`
+	BaseURL string `json:"base_url"`
 }
 
 type EvaluationSuite struct {

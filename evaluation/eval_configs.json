@@ -1,33 +1,26 @@
 [
   {
     "key": "prompt-comparison",
-    "provider": "ollama",
-    "base_url": "http://localhost:11434",
-    "models": ["qwen2.5-coder:14b"],
-    "prompts": ["optimized"],
-    "runs": 3
-  },
-  {
-    "key": "model-comparison",
-    "provider": "ollama",
-    "base_url": "http://localhost:11434",
-    "models": [
-      "qwen2.5-coder:14b",
-      "qwen2.5-coder:7b",
-      "llama3.1:8b",
-      "qwen3:8b"
+    "servers": [
+      {
+        "name": "qwen3-30b",
+        "base_url": "http://localhost:8080"
+      }
     ],
     "prompts": ["optimized"],
     "runs": 3
   },
   {
-    "key": "small-model-comparison",
-    "provider": "ollama",
-    "base_url": "http://localhost:11434",
-    "models": [
-      "qwen2.5-coder:7b",
-      "llama3.1:8b",
-      "qwen3:8b"
+    "key": "model-comparison",
+    "servers": [
+      {
+        "name": "qwen3-30b",
+        "base_url": "http://localhost:8080"
+      },
+      {
+        "name": "qwen2.5-14b",
+        "base_url": "http://localhost:8081"
+      }
     ],
     "prompts": ["optimized"],
     "runs": 3

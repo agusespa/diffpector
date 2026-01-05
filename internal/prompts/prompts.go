@@ -308,7 +308,10 @@ Example 4 - Incomplete security fix:
 ✅ MUST: Description must be actionable and specific
 ✅ MUST: Include code_snippet with the problematic code from the diff
 ✅ MUST: Return valid JSON array or exactly "APPROVED"
+✅ MUST: Complete the entire JSON array - do not stop mid-object
+✅ MUST: Ensure all JSON objects are properly closed with } and array ends with ]
 ✅ MUST: No additional text, explanations, markdown, or code blocks
 ❌ NEVER: Include reasoning, explanations, or commentary
 ❌ NEVER: Use markdown formatting in the response
-❌ NEVER: Add text before or after the JSON/APPROVED response`
+❌ NEVER: Add text before or after the JSON/APPROVED response
+❌ NEVER: Stop generating before closing the JSON array`
