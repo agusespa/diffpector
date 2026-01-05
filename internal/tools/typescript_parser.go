@@ -10,19 +10,32 @@ import (
 )
 
 type TypeScriptParser struct {
-	parser   *sitter.Parser
-	language *sitter.Language
+	parser      *sitter.Parser
+	language    *sitter.Language
+	tsxParser   *sitter.Parser
+	tsxLanguage *sitter.Language
 }
 
 func NewTypeScriptParser() (*TypeScriptParser, error) {
+	// TypeScript language
 	lang := sitter.NewLanguage(tree_sitter_typescript.LanguageTypescript())
 	parser := sitter.NewParser()
 	if err := parser.SetLanguage(lang); err != nil {
 		return nil, fmt.Errorf("failed to set language for parser: %w", err)
 	}
+
+	// TSX language for React/JSX files
+	tsxLang := sitter.NewLanguage(tree_sitter_typescript.LanguageTSX())
+	tsxParser := sitter.NewParser()
+	if err := tsxParser.SetLanguage(tsxLang); err != nil {
+		return nil, fmt.Errorf("failed to set TSX language for parser: %w", err)
+	}
+
 	return &TypeScriptParser{
-		parser:   parser,
-		language: lang,
+		parser:      parser,
+		language:    lang,
+		tsxParser:   tsxParser,
+		tsxLanguage: tsxLang,
 	}, nil
 }
 
@@ -69,7 +82,19 @@ func (tp *TypeScriptParser) ShouldExcludeFile(filePath, projectRoot string) bool
 }
 
 func (tp *TypeScriptParser) ParseFile(filePath string, content []byte) ([]types.Symbol, error) {
-	tree := tp.parser.Parse(content, nil)
+	// Use TSX parser for .tsx files, TypeScript parser for .ts files
+	isTSX := strings.HasSuffix(filePath, ".tsx")
+	var tree *sitter.Tree
+	var lang *sitter.Language
+
+	if isTSX {
+		tree = tp.tsxParser.Parse(content, nil)
+		lang = tp.tsxLanguage
+	} else {
+		tree = tp.parser.Parse(content, nil)
+		lang = tp.language
+	}
+
 	if tree == nil {
 		return nil, fmt.Errorf("failed to parse TypeScript file")
 	}
@@ -77,7 +102,10 @@ func (tp *TypeScriptParser) ParseFile(filePath string, content []byte) ([]types.
 
 	packageName := tp.extractModuleName(filePath)
 
-	queryText := `
+	// Use different queries based on file type
+	var queryText string
+	if isTSX {
+		queryText = `
 [
   ;; === Declarations ===
   (function_declaration) @func_decl
@@ -94,11 +122,47 @@ func (tp *TypeScriptParser) ParseFile(filePath string, content []byte) ([]types.
   (call_expression function: (identifier) @func_usage)
   (call_expression function: (member_expression property: (property_identifier) @method_usage))
   (member_expression property: (property_identifier) @field_usage)
+  
+  ;; === JSX/React Component Usages ===
+  (jsx_opening_element name: (identifier) @jsx_component_usage)
+  (jsx_self_closing_element name: (identifier) @jsx_component_usage)
+  (jsx_opening_element name: (member_expression property: (property_identifier) @jsx_member_component_usage))
+  (jsx_self_closing_element name: (member_expression property: (property_identifier) @jsx_member_component_usage))
+  
+  ;; === Type References (for TypeScript type annotations) ===
+  (type_identifier) @type_usage
+  
   (identifier) @var_usage
 ]
 `
+	} else {
+		queryText = `
+[
+  ;; === Declarations ===
+  (function_declaration) @func_decl
+  (method_definition) @method_decl
+  (class_declaration) @class_decl
+  (interface_declaration) @interface_decl
+  (type_alias_declaration) @type_decl
+  (enum_declaration) @enum_decl
+  (lexical_declaration) @var_decl
+  (variable_declaration) @var_decl
+  (import_statement) @import_decl
 
-	q, err := sitter.NewQuery(tp.language, queryText)
+  ;; === Usages ===
+  (call_expression function: (identifier) @func_usage)
+  (call_expression function: (member_expression property: (property_identifier) @method_usage))
+  (member_expression property: (property_identifier) @field_usage)
+  
+  ;; === Type References (for TypeScript type annotations) ===
+  (type_identifier) @type_usage
+  
+  (identifier) @var_usage
+]
+`
+	}
+
+	q, err := sitter.NewQuery(lang, queryText)
 	if err != nil {
 		return nil, err
 	}

@@ -188,10 +188,10 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 	var combinedContext strings.Builder
 
 	for path, data := range diffMap {
-		combinedContext.WriteString(fmt.Sprintf(">>> Diff for changed file: %s\n%s\n", path, data.Diff))
+		fmt.Fprintf(&combinedContext, ">>> Diff for changed file: %s\n%s\n", path, data.Diff)
 
 		if data.DiffContext != "" {
-			combinedContext.WriteString(fmt.Sprintf("\n>>>> Expanded Diff Context\n%s\n", data.DiffContext))
+			fmt.Fprintf(&combinedContext, "\n>>>> Expanded Diff Context\n%s\n", data.DiffContext)
 		}
 
 		combinedContext.WriteString("\n>>>> Affected Symbols\n")
@@ -201,6 +201,7 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 	}
 
 	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, combinedContext.String())
+	fmt.Println(prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}

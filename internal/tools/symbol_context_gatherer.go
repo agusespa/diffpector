@@ -85,7 +85,7 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 				}
 			}
 
-			if strings.HasSuffix(s.Type, "_usage") {
+			if strings.HasSuffix(s.Type, "_usage") || strings.Contains(s.Type, "jsx_") || s.Type == "type_usage" {
 				key := fmt.Sprintf("usage:%s:%d-%d", filePath, s.StartLine, s.EndLine)
 				if !seen[key] {
 					seen[key] = true
