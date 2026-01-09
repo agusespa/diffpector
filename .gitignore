@@ -36,5 +36,6 @@ go.work.sum
 
 # Generated
 */results/
+*/logs/
 diffpector_report.md
 /build/

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
@@ -50,7 +51,13 @@ func (sm *ServerManager) StartServer(modelPath string) error {
 	sm.cmd = exec.CommandContext(ctx, sm.llamaServerPath, args...)
 
 	// Redirect output to log file instead of terminal
-	logFile, err := os.Create(fmt.Sprintf("/tmp/llama-server-%d.log", sm.port))
+	logDir := filepath.Join("evaluation", "logs")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory: %w", err)
+	}
+	logPath := fmt.Sprintf("%s/llama-server-%d.log", logDir, sm.port)
+	logFile, err := os.Create(logPath)
+
 	if err != nil {
 		sm.cancel()
 		sm.cmd = nil
