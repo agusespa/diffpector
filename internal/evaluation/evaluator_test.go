@@ -97,7 +97,7 @@ func TestRunSingleTest_ApprovedResponse(t *testing.T) {
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 	provider := &mockProvider{response: "APPROVED"}
 
-	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	result, err := evaluator.runSingleTest(testCase, provider, "test-model", "default")
 	if err != nil {
 		t.Fatalf("runSingleTest() failed: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestRunSingleTest_JSONResponse(t *testing.T) {
 
 	provider := &mockProvider{response: jsonResponse}
 
-	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	result, err := evaluator.runSingleTest(testCase, provider, "test-model", "default")
 	if err != nil {
 		t.Fatalf("runSingleTest() failed: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRunSingleTest_MalformedResponse(t *testing.T) {
 
 	provider := &mockProvider{response: malformedResponse}
 
-	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	result, err := evaluator.runSingleTest(testCase, provider, "test-model", "default")
 	if err != nil {
 		t.Fatalf("runSingleTest() failed: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestRunSingleTest_FormatViolation(t *testing.T) {
 
 	provider := &mockProvider{response: formatViolationResponse}
 
-	result, err := evaluator.runSingleTest(testCase, provider, "default")
+	result, err := evaluator.runSingleTest(testCase, provider, "test-model", "default")
 	if err != nil {
 		t.Fatalf("runSingleTest() failed: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestRunSingleTest_ProviderError(t *testing.T) {
 	evaluator, testCase := createTestEvaluator(t, tempDir, mockFiles)
 	provider := &mockProvider{err: errors.New("provider error")}
 
-	_, err := evaluator.runSingleTest(testCase, provider, "default")
+	_, err := evaluator.runSingleTest(testCase, provider, "test-model", "default")
 	if err == nil {
 		t.Error("Expected error when provider fails")
 	}

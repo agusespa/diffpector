@@ -4,13 +4,13 @@ Systematically tests different prompts and models to establish baselines and opt
 
 ## Overview
 
-The evaluation system is **server-based**, allowing you to test different models by running multiple llama.cpp servers on different ports.
+The evaluation system **automatically manages llama-server**, loading one model at a time. You don't need to manually start servers - just specify the model paths in the config and the pipeline handles everything.
 
 The evaluation system consists of:
 
 - **Test Suite**: A collection of test cases with known expected outcomes
 - **Prompt Variants**: Different prompt templates optimized for various scenarios
-- **Server Configurations**: Multiple server endpoints, each running a different model
+- **Model Configurations**: Model paths for sequential testing
 - **Scoring System**: Automated scoring based on expected vs actual results
 - **Comparison Tools**: Compare performance across different configurations
 
@@ -19,7 +19,7 @@ The evaluation system consists of:
 Edit `eval_configs.json` to define your evaluation scenarios. Each configuration specifies:
 
 - **key**: Unique identifier for the evaluation run
-- **servers**: List of llama.cpp server endpoints to test (each represents one model)
+- **servers**: List of models to test (each with name and model_path)
 - **prompts**: Prompt variants to test
 - **runs**: Number of times to run each test (for statistical significance)
 
@@ -27,21 +27,9 @@ Edit `eval_configs.json` to define your evaluation scenarios. Each configuration
 
 Each server entry requires:
 - **name**: Descriptive name for the model (used in results)
-- **base_url**: Server endpoint URL
+- **model_path**: Path to the GGUF model file (can be absolute or relative)
 
-### Example: Testing Multiple Models
-
-To compare different models, run each llama.cpp server on a different port:
-
-```bash
-# Terminal 1: Start first model
-./llama-server -m qwen3-30b.gguf --port 8080
-
-# Terminal 2: Start second model
-./llama-server -m qwen2.5-14b.gguf --port 8081
-```
-
-Then configure in `eval_configs.json`:
+### Example Configuration
 
 ```json
 {
@@ -49,17 +37,26 @@ Then configure in `eval_configs.json`:
   "servers": [
     {
       "name": "qwen3-30b",
-      "base_url": "http://localhost:8080"
+      "model_path": "/Users/username/models/qwen3-30b.gguf"
     },
     {
       "name": "qwen2.5-14b",
-      "base_url": "http://localhost:8081"
+      "model_path": "/Users/username/models/qwen2.5-14b.gguf"
     }
   ],
   "prompts": ["optimized"],
   "runs": 3
 }
 ```
+
+The pipeline will:
+1. Start llama-server with qwen3-30b
+2. Run all evaluations for that model
+3. Stop the server
+4. Start llama-server with qwen2.5-14b
+5. Run all evaluations for that model
+6. Stop the server
+7. Generate comparison results
 
 ## Test Cases
 
@@ -89,6 +86,32 @@ make eval-run VARIANT=model-comparison
 make eval-compare-models
 make eval-compare-prompts
 ```
+
+### Advanced Options
+
+You can customize the llama-server path, port, and additional arguments:
+
+```bash
+# Use a custom llama-server binary
+go run cmd/eval/main.go --variant model-comparison --llama-server /path/to/llama-server
+
+# Use a different port (default is 8080)
+go run cmd/eval/main.go --variant model-comparison --port 8081
+
+# Customize llama-server arguments (context size, GPU layers, threads, etc.)
+go run cmd/eval/main.go --variant model-comparison \
+  --server-args "-c 65536 -n 8192 -ngl 99 -b 2048 -ub 1024 --threads 12"
+```
+
+Default server arguments: `-c 65536 -n 8192 -ngl 99 -b 2048 -ub 1024 --threads 12`
+
+These arguments configure:
+- `-c 65536`: Context size
+- `-n 8192`: Max tokens to predict
+- `-ngl 99`: GPU layers to offload
+- `-b 2048`: Batch size
+- `-ub 1024`: Unbatch size
+- `--threads 12`: CPU threads to use
 
 ## Results and Scoring
 

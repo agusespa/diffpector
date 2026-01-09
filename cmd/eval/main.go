@@ -20,13 +20,16 @@ func main() {
 		compare        = flag.Bool("compare", false, "Compare existing results instead of running new evaluation")
 		comparePrompts = flag.Bool("compare-prompts", false, "Compare prompt variants")
 		listPrompts    = flag.Bool("list-prompts", false, "List available prompt variants")
+		llamaServer    = flag.String("llama-server", "llama-server", "Path to llama-server executable")
+		port           = flag.Int("port", 8080, "Port for llama-server")
+		serverArgs     = flag.String("server-args", "-c 65536 -n 8192 -ngl 99 -b 2048 -ub 1024 --threads 12", "Additional arguments for llama-server")
 	)
 	flag.Parse()
 
 	fmt.Println("")
-	fmt.Println("============================")
-	fmt.Println(" Diffpector Evaluation Tool ")
-	fmt.Println("============================")
+	fmt.Println("==========================")
+	fmt.Println(" Diffpector Eval Pipeline ")
+	fmt.Println("==========================")
 	fmt.Println("")
 
 	if *listPrompts {
@@ -55,13 +58,13 @@ func main() {
 		return
 	}
 
-	if err := runEvaluation(*suiteFile, *resultsDir, *configFile, *variant); err != nil {
+	if err := runEvaluation(*suiteFile, *resultsDir, *configFile, *variant, *llamaServer, *port, *serverArgs); err != nil {
 		fmt.Fprintf(os.Stderr, "Error running evaluation: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
+func runEvaluation(suiteFile, resultsDir, configFile, variantKey, llamaServerPath string, port int, serverArgs string) error {
 	configs, err := evaluation.LoadConfigs(configFile)
 	if err != nil {
 		return fmt.Errorf("failed to load evaluation configs: %w", err)
@@ -72,6 +75,11 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
 		return fmt.Errorf("failed to create evaluator: %w", err)
 	}
 
+	// Parse server arguments
+	args := strings.Fields(serverArgs)
+	serverManager := evaluation.NewServerManager(llamaServerPath, port, args...)
+	defer serverManager.StopServer()
+
 	for _, config := range configs {
 		if variantKey != "" && config.Key != variantKey {
 			continue
@@ -79,14 +87,37 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey string) error {
 		fmt.Printf("--- Running Configuration: %s ---\n", config.Key)
 
 		for _, server := range config.Servers {
-			for _, prompt := range config.Prompts {
-				runSingleEvaluation(evaluator, server, prompt, config.Runs)
+			if server.ModelPath == "" {
+				fmt.Printf("Error: server '%s' missing required 'model_path' field\n", server.Name)
+				return fmt.Errorf("server '%s' missing model_path", server.Name)
 			}
+
+			fmt.Printf("Loading model: %s\n", server.Name)
+			fmt.Printf("Model path: %s\n", server.ModelPath)
+
+			if err := serverManager.StartServer(server.ModelPath); err != nil {
+				return fmt.Errorf("failed to start server for %s: %w", server.Name, err)
+			}
+
+			serverCopy := server
+			serverCopy.BaseURL = fmt.Sprintf("http://localhost:%d", port)
+
+			for _, prompt := range config.Prompts {
+				runSingleEvaluation(evaluator, serverCopy, prompt, config.Runs)
+			}
+
+			fmt.Printf("\nStopping server for %s...\n", server.Name)
+			serverManager.StopServer()
+			fmt.Println("\n------------------------------")
 		}
 	}
 
-	fmt.Println("All evaluations complete.")
-	fmt.Println("To compare results, run: make eval-compare-{prompts/models}")
+	fmt.Println("\n------------------------------")
+	fmt.Println("All evaluations complete!")
+	fmt.Println("------------------------------")
+	fmt.Println("To compare results, run:")
+	fmt.Println("  make eval-compare-models")
+	fmt.Println("  make eval-compare-prompts")
 
 	return nil
 }
@@ -99,7 +130,7 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, server evaluation.Serv
 		return
 	}
 
-	fmt.Printf("=== Warming up server: %s ===\n", server.Name)
+	fmt.Printf("--- Warming up server: %s ---\n", server.Name)
 
 	llmConfig := llm.ProviderConfig{
 		Type:    llm.ProviderOpenAI,

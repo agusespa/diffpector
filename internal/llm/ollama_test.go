@@ -197,7 +197,7 @@ func TestOllamaProvider_ChatWithTools_WithToolCalls(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -226,7 +226,7 @@ func TestOllamaProvider_ChatWithTools_JSONFallback(t *testing.T) {
 		response.Message.Content = `{"name": "analyze_diff", "arguments": {"file": "test.go"}}`
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -246,7 +246,7 @@ func TestOllamaProvider_ChatWithTools_JSONFallback(t *testing.T) {
 func TestOllamaProvider_ChatWithTools_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("bad request"))
+		_, _ = w.Write([]byte("bad request"))
 	}))
 	defer server.Close()
 

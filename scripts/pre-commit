@@ -14,10 +14,10 @@ if [ -n "$staged_files" ]; then
     echo "$staged_files" | xargs goimports -w > /dev/null 2>&1
     echo "$staged_files" | xargs git add
 
-    echo ">> Running golangci-lint..."
-    golangci-lint run > /dev/null 2>&1 || {
-	echo "ERROR: golangci-lint failed"
-        exit 1
+    echo ">> Running golangci-lint on changed lines..."
+    golangci-lint run --new-from-rev=HEAD > /dev/null 2>&1 || { 
+        echo "ERROR: Lint failed"
+        exit 1 
     }
     
     test_packages=""

@@ -21,12 +21,13 @@ func TestLoadConfigs(t *testing.T) {
 
 	configs := []types.EvaluationConfig{
 		{
-			Key:      "test-config",
-			Provider: "ollama",
-			BaseURL:  "http://localhost:11434",
-			Models:   []string{"model1", "model2"},
-			Prompts:  []string{"prompt1", "prompt2"},
-			Runs:     3,
+			Key: "test-config",
+			Servers: []types.ServerConfig{
+				{Name: "model1", ModelPath: "/path/to/model1.gguf"},
+				{Name: "model2", ModelPath: "/path/to/model2.gguf"},
+			},
+			Prompts: []string{"prompt1", "prompt2"},
+			Runs:    3,
 		},
 	}
 
@@ -55,12 +56,8 @@ func TestLoadConfigs(t *testing.T) {
 		t.Errorf("Expected key 'test-config', got '%s'", config.Key)
 	}
 
-	if config.Provider != "ollama" {
-		t.Errorf("Expected provider 'ollama', got '%s'", config.Provider)
-	}
-
-	if len(config.Models) != 2 {
-		t.Errorf("Expected 2 models, got %d", len(config.Models))
+	if len(config.Servers) != 2 {
+		t.Errorf("Expected 2 servers, got %d", len(config.Servers))
 	}
 
 	if config.Runs != 3 {
@@ -107,10 +104,11 @@ func TestLoadConfigs_InvalidJSON(t *testing.T) {
 func TestValidateConfig(t *testing.T) {
 	// Valid config
 	validConfig := types.EvaluationConfig{
-		Key:      "valid",
-		Provider: "ollama",
-		Models:   []string{"model1"},
-		Prompts:  []string{"prompt1"},
+		Key: "valid",
+		Servers: []types.ServerConfig{
+			{Name: "model1", ModelPath: "/path/to/model1.gguf"},
+		},
+		Prompts: []string{"prompt1"},
 	}
 
 	err := ValidateConfig(validConfig)
@@ -120,9 +118,10 @@ func TestValidateConfig(t *testing.T) {
 
 	// Missing key
 	missingKey := types.EvaluationConfig{
-		Provider: "ollama",
-		Models:   []string{"model1"},
-		Prompts:  []string{"prompt1"},
+		Servers: []types.ServerConfig{
+			{Name: "model1", ModelPath: "/path/to/model1.gguf"},
+		},
+		Prompts: []string{"prompt1"},
 	}
 
 	err = ValidateConfig(missingKey)
@@ -133,41 +132,60 @@ func TestValidateConfig(t *testing.T) {
 		t.Errorf("Expected key error, got: %v", err)
 	}
 
-	// Missing provider
-	missingProvider := types.EvaluationConfig{
+	// Missing servers
+	missingServers := types.EvaluationConfig{
 		Key:     "test",
-		Models:  []string{"model1"},
 		Prompts: []string{"prompt1"},
 	}
 
-	err = ValidateConfig(missingProvider)
+	err = ValidateConfig(missingServers)
 	if err == nil {
-		t.Error("Expected error for missing provider")
+		t.Error("Expected error for missing servers")
 	}
-	if !strings.Contains(err.Error(), "missing required 'provider' field") {
-		t.Errorf("Expected provider error, got: %v", err)
+	if !strings.Contains(err.Error(), "missing required 'servers' field") {
+		t.Errorf("Expected servers error, got: %v", err)
 	}
 
-	// Missing models
-	missingModels := types.EvaluationConfig{
-		Key:      "test",
-		Provider: "ollama",
-		Prompts:  []string{"prompt1"},
+	// Server missing name
+	missingServerName := types.EvaluationConfig{
+		Key: "test",
+		Servers: []types.ServerConfig{
+			{ModelPath: "/path/to/model.gguf"},
+		},
+		Prompts: []string{"prompt1"},
 	}
 
-	err = ValidateConfig(missingModels)
+	err = ValidateConfig(missingServerName)
 	if err == nil {
-		t.Error("Expected error for missing models")
+		t.Error("Expected error for missing server name")
 	}
-	if !strings.Contains(err.Error(), "missing required 'models' field") {
-		t.Errorf("Expected models error, got: %v", err)
+	if !strings.Contains(err.Error(), "missing required 'name' field") {
+		t.Errorf("Expected name error, got: %v", err)
+	}
+
+	// Server missing model_path
+	missingModelPath := types.EvaluationConfig{
+		Key: "test",
+		Servers: []types.ServerConfig{
+			{Name: "model1"},
+		},
+		Prompts: []string{"prompt1"},
+	}
+
+	err = ValidateConfig(missingModelPath)
+	if err == nil {
+		t.Error("Expected error for missing model_path")
+	}
+	if !strings.Contains(err.Error(), "missing required 'model_path' field") {
+		t.Errorf("Expected model_path error, got: %v", err)
 	}
 
 	// Missing prompts
 	missingPrompts := types.EvaluationConfig{
-		Key:      "test",
-		Provider: "ollama",
-		Models:   []string{"model1"},
+		Key: "test",
+		Servers: []types.ServerConfig{
+			{Name: "model1", ModelPath: "/path/to/model1.gguf"},
+		},
 	}
 
 	err = ValidateConfig(missingPrompts)
@@ -183,16 +201,18 @@ func TestValidateConfigs(t *testing.T) {
 	// Valid configs
 	validConfigs := []types.EvaluationConfig{
 		{
-			Key:      "config1",
-			Provider: "ollama",
-			Models:   []string{"model1"},
-			Prompts:  []string{"prompt1"},
+			Key: "config1",
+			Servers: []types.ServerConfig{
+				{Name: "model1", ModelPath: "/path/to/model1.gguf"},
+			},
+			Prompts: []string{"prompt1"},
 		},
 		{
-			Key:      "config2",
-			Provider: "openai",
-			Models:   []string{"model2"},
-			Prompts:  []string{"prompt2"},
+			Key: "config2",
+			Servers: []types.ServerConfig{
+				{Name: "model2", ModelPath: "/path/to/model2.gguf"},
+			},
+			Prompts: []string{"prompt2"},
 		},
 	}
 
@@ -213,16 +233,18 @@ func TestValidateConfigs(t *testing.T) {
 	// Duplicate keys
 	duplicateConfigs := []types.EvaluationConfig{
 		{
-			Key:      "duplicate",
-			Provider: "ollama",
-			Models:   []string{"model1"},
-			Prompts:  []string{"prompt1"},
+			Key: "duplicate",
+			Servers: []types.ServerConfig{
+				{Name: "model1", ModelPath: "/path/to/model1.gguf"},
+			},
+			Prompts: []string{"prompt1"},
 		},
 		{
-			Key:      "duplicate",
-			Provider: "openai",
-			Models:   []string{"model2"},
-			Prompts:  []string{"prompt2"},
+			Key: "duplicate",
+			Servers: []types.ServerConfig{
+				{Name: "model2", ModelPath: "/path/to/model2.gguf"},
+			},
+			Prompts: []string{"prompt2"},
 		},
 	}
 

@@ -4,7 +4,7 @@
     "servers": [
       {
         "name": "qwen3-30b",
-        "base_url": "http://localhost:8080"
+        "model_path": "/Users/agustinespana/Code/gguf_models/Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf"
       }
     ],
     "prompts": ["optimized"],
@@ -15,11 +15,11 @@
     "servers": [
       {
         "name": "qwen3-30b",
-        "base_url": "http://localhost:8080"
+        "model_path": "/Users/agustinespana/Code/gguf_models/Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf"
       },
       {
         "name": "qwen2.5-14b",
-        "base_url": "http://localhost:8081"
+        "model_path": "/Users/agustinespana/Code/gguf_models/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
       }
     ],
     "prompts": ["optimized"],

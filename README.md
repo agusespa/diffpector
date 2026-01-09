@@ -71,5 +71,4 @@ The `model` field is optional for llama.cpp since the model is already loaded wh
 For Ollama, you must specify the `model` field.
 
 ### Recommended Models
-- **qwen3-coder:30b** - best balance between accuracy and performance
-- **qwen2.5-coder:7b** - acceptable compromise for quick reviews on less cabable hardware
+- **qwen 3 coder (30b, q4)** - best balance between accuracy and performance (if memory constrained use **qwen 2.5 coder (14b, q4)** instead)

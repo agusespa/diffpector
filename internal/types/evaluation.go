@@ -10,8 +10,9 @@ type EvaluationConfig struct {
 }
 
 type ServerConfig struct {
-	Name    string `json:"name"`
-	BaseURL string `json:"base_url"`
+	Name      string `json:"name"`
+	ModelPath string `json:"model_path"`
+	BaseURL   string `json:"-"` // Set dynamically by the evaluation runner
 }
 
 type EvaluationSuite struct {

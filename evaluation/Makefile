@@ -12,7 +12,7 @@ eval-help:
 	@echo ""
 	@echo "🚀 Running Evaluations:"
 	@echo "  make eval-prompts          - Compare prompt variants using default model"
-	@echo "  make eval-models           - Compare model performance using default prompt"
+	@echo "  make eval-models           - Compare model performance (auto-manages llama-server)"
 	@echo ""
 	@echo "📊 Analyzing Results:"
 	@echo "  make eval-compare-prompts  - Analyze existing prompt comparison results"

@@ -33,8 +33,8 @@ func ValidateConfig(config types.EvaluationConfig) error {
 		if server.Name == "" {
 			return fmt.Errorf("server %d missing required 'name' field", i)
 		}
-		if server.BaseURL == "" {
-			return fmt.Errorf("server '%s' missing required 'base_url' field", server.Name)
+		if server.ModelPath == "" {
+			return fmt.Errorf("server '%s' missing required 'model_path' field", server.Name)
 		}
 	}
 	if len(config.Prompts) == 0 {
