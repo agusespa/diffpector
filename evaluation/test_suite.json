@@ -8,7 +8,9 @@
       "diff_file": "go_sql_injection.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": ["CRITICAL"],
+        "expected_severity": [
+          "CRITICAL"
+        ],
         "min_issues": 1,
         "max_issues": 3
       }
@@ -19,7 +21,10 @@
       "diff_file": "go_xss_vulnerability.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": ["HIGH", "CRITICAL"],
+        "expected_severity": [
+          "HIGH",
+          "CRITICAL"
+        ],
         "min_issues": 1,
         "max_issues": 2
       }
@@ -30,7 +35,10 @@
       "diff_file": "go_path_traversal.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": ["HIGH", "CRITICAL"],
+        "expected_severity": [
+          "HIGH",
+          "CRITICAL"
+        ],
         "min_issues": 1,
         "max_issues": 2
       }
@@ -41,9 +49,26 @@
       "diff_file": "go_authorization_bypass.diff",
       "expected": {
         "should_find_issues": true,
-        "expected_severity": ["HIGH", "CRITICAL"],
+        "expected_severity": [
+          "HIGH",
+          "CRITICAL"
+        ],
         "min_issues": 1,
         "max_issues": 2
+      }
+    },
+    {
+      "name": "java_atomicity_violation",
+      "description": "Test detection of consistency bug when extracting network calls from transactions in Java",
+      "diff_file": "java_atomicity_violation.diff",
+      "expected": {
+        "should_find_issues": true,
+        "expected_severity": [
+          "HIGH",
+          "CRITICAL"
+        ],
+        "min_issues": 1,
+        "max_issues": 3
       }
     }
   ]

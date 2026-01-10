@@ -75,7 +75,7 @@ func (sm *ServerManager) StartServer(modelPath string) error {
 		return fmt.Errorf("failed to start llama-server: %w", err)
 	}
 
-	fmt.Printf("llama-server output: /tmp/llama-server-%d.log\n", sm.port)
+	fmt.Printf("llama-server output: %s\n", logPath)
 
 	// Wait for server to be ready (increased timeout for large models)
 	if err := sm.waitForServer(120 * time.Second); err != nil {
@@ -125,15 +125,14 @@ func (sm *ServerManager) waitForServer(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	healthURL := fmt.Sprintf("http://localhost:%d/health", sm.port)
 
-	fmt.Printf("Waiting for server to load model (timeout: %v)...\n", timeout)
+	fmt.Printf("Waiting for server to load model (timeout: %v)...", timeout)
 
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(healthURL)
 		if err == nil {
 			_ = resp.Body.Close()
-			// Only consider 200 OK as ready - 503 means still loading
 			if resp.StatusCode == http.StatusOK {
-				fmt.Println("Server is ready!")
+				fmt.Println(" Server is ready!")
 				// Give it a bit more time to stabilize
 				time.Sleep(3 * time.Second)
 				return nil

@@ -201,7 +201,7 @@ func (a *CodeReviewAgent) GenerateReview(diffMap map[string]types.DiffData) (str
 	}
 
 	prompt, err := prompts.BuildPromptWithTemplate(a.promptVariant, combinedContext.String())
-	fmt.Println(prompt)
+	// fmt.Println(prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to build review prompt: %w", err)
 	}

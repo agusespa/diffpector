@@ -113,25 +113,25 @@ func PrintTestResult(result *types.TestCaseResult, err error) {
 }
 
 func PrintSummary(r *types.EvaluationRun) {
-	fmt.Printf("\n--- Summary for %s (%s) ---\n", r.Model, r.PromptVariant)
-	fmt.Printf("  Average Score: %.2f\n", r.AverageScore)
-	fmt.Printf("  Success Rate:  %.2f%%\n", r.SuccessRate)
-	fmt.Printf("  Total Duration:  %.2fs\n", r.TotalDuration.Seconds())
+	fmt.Printf("\n=== Evaluation Summary for %s (%s) ===\n", r.Model, r.PromptVariant)
+	fmt.Printf("Average Score: %.2f\n", r.AverageScore)
+	fmt.Printf("Success Rate:  %.2f%%\n", r.SuccessRate)
+	fmt.Printf("Total Duration:  %.2fs\n", r.TotalDuration.Seconds())
 	fmt.Println()
 }
 
 func PrintEvaluationSummary(r *types.EvaluationResult) {
-	fmt.Printf("\n--- Evaluation Summary for %s (%s) ---\n", r.Model, r.PromptVariant)
-	fmt.Printf("  Runs: %d\n", r.TotalRuns)
-	fmt.Printf("  Average Score: %.2f (±%.2f)\n", r.AggregatedStats.AverageScore, r.AggregatedStats.ScoreStdDev)
-	fmt.Printf("  Success Rate: %.2f%% (±%.2f%%)\n", r.AggregatedStats.AverageSuccessRate, r.AggregatedStats.SuccessRateStdDev)
-	fmt.Printf("  Average Duration: %.2fs (±%.2fs)\n", r.AggregatedStats.AverageDuration, r.AggregatedStats.DurationStdDev)
-	fmt.Printf("  Total Duration: %.2fs\n", r.TotalDuration.Seconds())
+	fmt.Printf("\n=== Evaluation Summary for %s (%s) ===\n", r.Model, r.PromptVariant)
+	fmt.Printf("Runs: %d\n", r.TotalRuns)
+	fmt.Printf("Average Score: %.2f (±%.2f)\n", r.AggregatedStats.AverageScore, r.AggregatedStats.ScoreStdDev)
+	fmt.Printf("Success Rate: %.2f%% (±%.2f%%)\n", r.AggregatedStats.AverageSuccessRate, r.AggregatedStats.SuccessRateStdDev)
+	fmt.Printf("Average Duration: %.2fs (±%.2fs)\n", r.AggregatedStats.AverageDuration, r.AggregatedStats.DurationStdDev)
+	fmt.Printf("Total Duration: %.2fs\n", r.TotalDuration.Seconds())
 
 	if r.TotalRuns > 1 && len(r.TestCaseStats) > 0 {
-		fmt.Printf("\n  Test Case Performance:\n")
+		fmt.Printf("\nTest Case Performance:\n")
 		for _, stats := range r.TestCaseStats {
-			fmt.Printf("    %s: %.2f (±%.2f)\n", stats.TestCaseName, stats.AverageScore, stats.ScoreStdDev)
+			fmt.Printf("  %s: %.2f (±%.2f)\n", stats.TestCaseName, stats.AverageScore, stats.ScoreStdDev)
 		}
 	}
 	fmt.Println()

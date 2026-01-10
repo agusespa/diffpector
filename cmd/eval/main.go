@@ -84,7 +84,7 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey, llamaServerPat
 		if variantKey != "" && config.Key != variantKey {
 			continue
 		}
-		fmt.Printf("--- Running Configuration: %s ---\n", config.Key)
+		fmt.Printf("Running Configuration: %s\n\n", config.Key)
 
 		for _, server := range config.Servers {
 			if server.ModelPath == "" {
@@ -93,7 +93,6 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey, llamaServerPat
 			}
 
 			fmt.Printf("Loading model: %s\n", server.Name)
-			fmt.Printf("Model path: %s\n", server.ModelPath)
 
 			if err := serverManager.StartServer(server.ModelPath); err != nil {
 				return fmt.Errorf("failed to start server for %s: %w", server.Name, err)
@@ -108,13 +107,11 @@ func runEvaluation(suiteFile, resultsDir, configFile, variantKey, llamaServerPat
 
 			fmt.Printf("\nStopping server for %s...\n", server.Name)
 			serverManager.StopServer()
-			fmt.Println("\n------------------------------")
 		}
 	}
 
 	fmt.Println("\n------------------------------")
 	fmt.Println("All evaluations complete!")
-	fmt.Println("------------------------------")
 	fmt.Println("To compare results, run:")
 	fmt.Println("  make eval-compare-models")
 	fmt.Println("  make eval-compare-prompts")
@@ -130,7 +127,7 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, server evaluation.Serv
 		return
 	}
 
-	fmt.Printf("--- Warming up server: %s ---\n", server.Name)
+	fmt.Printf("Warming up server for model %s\n\n", server.Name)
 
 	llmConfig := llm.ProviderConfig{
 		Type:    llm.ProviderOpenAI,
@@ -162,7 +159,6 @@ func runSingleEvaluation(evaluator *evaluation.Evaluator, server evaluation.Serv
 	if err := evaluator.SaveEvaluationResults(result); err != nil {
 		fmt.Printf("Warning: failed to save results: %v\n", err)
 	}
-	fmt.Println()
 }
 
 func printHelp() {
