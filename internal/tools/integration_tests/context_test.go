@@ -102,6 +102,14 @@ func TestGatherEnhancedContext(t *testing.T) {
 
 				assert.Contains(t, getUserSymbol.Snippets, "public User getUser(String userId)", "Snippet should contain the getUser method code")
 
+				// Verify Reference Resolution (Deep Context)
+				// 1. Return Type 'User' is used in signature, so we should find its class definition
+				assert.Contains(t, getUserSymbol.Snippets, ">>>> Referenced Symbol: User", "Should find User reference")
+				assert.Contains(t, getUserSymbol.Snippets, "public class User", "Should contain User definition")
+
+				// 2. Method 'findById' is called, so we should find its definition
+				assert.Contains(t, getUserSymbol.Snippets, ">>>> Referenced Symbol: findById", "Should find findById reference header")
+				assert.Contains(t, getUserSymbol.Snippets, "public User findById(String id)", "Should contain findById definition")
 			},
 		},
 		{

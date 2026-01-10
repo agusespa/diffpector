@@ -87,6 +87,7 @@ func (jp *JavaParser) ParseFile(filePath string, content []byte) ([]types.Symbol
   (method_invocation name: (identifier) @method_usage)
   (field_access field: (identifier) @field_usage)
   (identifier) @var_usage
+  (type_identifier) @type_usage
 ]
 `
 

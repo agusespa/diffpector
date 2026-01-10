@@ -25,19 +25,46 @@ func (g *SymbolContextGatherer) GatherSymbolContext(affectedSymbols []types.Symb
 		return nil
 	}
 
+	// Track processed symbols to avoid duplication in secondary pass
+	processedRefs := make(map[string]bool)
+
 	for i := range affectedSymbols {
 		var contextBuilder strings.Builder
 
-		context, err := g.addSymbolContexts(affectedSymbols[i].Symbol, projectRoot, primaryLanguage)
+		// Primary Pass: Gather context for the affected symbol and extract references
+		primaryContext, refs, err := g.gatherContextWithRefs(affectedSymbols[i].Symbol, projectRoot, primaryLanguage)
 		if err != nil {
 			continue
 		}
 
-		if context != "" {
+		if primaryContext != "" {
 			contextBuilder.WriteString(fmt.Sprintf(">>>>> Symbol: %s (Package: %s)\n",
 				affectedSymbols[i].Symbol.Name,
 				affectedSymbols[i].Symbol.Package))
-			contextBuilder.WriteString(context)
+			contextBuilder.WriteString(primaryContext)
+		}
+
+		// Secondary Pass: Gather definitions for referenced symbols
+		for _, refName := range refs {
+			// Skip if already processed or is the symbol itself
+			if processedRefs[refName] || refName == affectedSymbols[i].Symbol.Name {
+				continue
+			}
+			processedRefs[refName] = true
+
+			// Create a symbol with just the name
+			refSym := types.Symbol{Name: refName}
+
+			// Find definitions only (no recursive ref extraction)
+			secondaryContext, err := g.gatherDefinitionsOnly(refSym, projectRoot, primaryLanguage)
+			if err != nil {
+				continue
+			}
+
+			if secondaryContext != "" {
+				contextBuilder.WriteString(fmt.Sprintf(">>>> Referenced Symbol: %s\n", refName))
+				contextBuilder.WriteString(secondaryContext)
+			}
 		}
 
 		affectedSymbols[i].Snippets = contextBuilder.String()
@@ -46,7 +73,78 @@ func (g *SymbolContextGatherer) GatherSymbolContext(affectedSymbols []types.Symb
 	return nil
 }
 
-func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRoot, primaryLanguage string) (string, error) {
+// gatherContextWithRefs finds definitions and usages of a symbol,
+// and extracts references to other symbols used within the definition.
+func (g *SymbolContextGatherer) gatherContextWithRefs(symbol types.Symbol, projectRoot, primaryLanguage string) (string, []string, error) {
+	candidateFiles, err := g.findCandidateFiles(symbol, projectRoot, primaryLanguage)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to find candidate files for symbol %s: %w", symbol.Name, err)
+	}
+	if len(candidateFiles) == 0 {
+		return "", nil, nil
+	}
+
+	var contextBuilder strings.Builder
+	var references []string
+	refMap := make(map[string]bool)
+	seen := make(map[string]bool)
+
+	for _, filePath := range candidateFiles {
+		content, err := os.ReadFile(filepath.Join(filePath))
+		if err != nil {
+			continue
+		}
+		symbols, err := g.parserRegistry.ParseFile(filePath, content)
+		if err != nil {
+			continue
+		}
+
+		for _, s := range symbols {
+			if s.Name != symbol.Name {
+				continue
+			}
+
+			snippet := extractSnippet(content, s.StartLine, s.EndLine)
+
+			if strings.HasSuffix(s.Type, "_decl") {
+				key := fmt.Sprintf("decl:%s:%d-%d", filePath, s.StartLine, s.EndLine)
+				if !seen[key] {
+					seen[key] = true
+					contextBuilder.WriteString(fmt.Sprintf(">>>>>> Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
+					contextBuilder.WriteString(snippet)
+					contextBuilder.WriteString("\n")
+
+					// Extract references: scan for usages INSIDE this declaration
+					for _, inner := range symbols {
+						if inner.StartLine >= s.StartLine && inner.EndLine <= s.EndLine {
+							if isUsageType(inner.Type) && inner.Name != symbol.Name {
+								if !refMap[inner.Name] {
+									refMap[inner.Name] = true
+									references = append(references, inner.Name)
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if isUsageType(s.Type) {
+				key := fmt.Sprintf("usage:%s:%d-%d", filePath, s.StartLine, s.EndLine)
+				if !seen[key] {
+					seen[key] = true
+					contextBuilder.WriteString(fmt.Sprintf(">>>>>> Usage in %s (line %d):\n", filePath, s.StartLine))
+					contextBuilder.WriteString(snippet)
+					contextBuilder.WriteString("\n")
+				}
+			}
+		}
+	}
+
+	return contextBuilder.String(), references, nil
+}
+
+// gatherDefinitionsOnly finds only definitions of a symbol (no usages, no recursive refs).
+func (g *SymbolContextGatherer) gatherDefinitionsOnly(symbol types.Symbol, projectRoot, primaryLanguage string) (string, error) {
 	candidateFiles, err := g.findCandidateFiles(symbol, projectRoot, primaryLanguage)
 	if err != nil {
 		return "", fmt.Errorf("failed to find candidate files for symbol %s: %w", symbol.Name, err)
@@ -67,29 +165,18 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 		if err != nil {
 			continue
 		}
+
 		for _, s := range symbols {
-			// TODO improve with more metadata from tree sitter
 			if s.Name != symbol.Name {
 				continue
 			}
-
-			snippet := extractSnippet(content, s.StartLine, s.EndLine)
 
 			if strings.HasSuffix(s.Type, "_decl") {
 				key := fmt.Sprintf("decl:%s:%d-%d", filePath, s.StartLine, s.EndLine)
 				if !seen[key] {
 					seen[key] = true
+					snippet := extractSnippet(content, s.StartLine, s.EndLine)
 					contextBuilder.WriteString(fmt.Sprintf(">>>>>> Definition in %s (lines %d-%d):\n", filePath, s.StartLine, s.EndLine))
-					contextBuilder.WriteString(snippet)
-					contextBuilder.WriteString("\n")
-				}
-			}
-
-			if strings.HasSuffix(s.Type, "_usage") || strings.Contains(s.Type, "jsx_") || s.Type == "type_usage" {
-				key := fmt.Sprintf("usage:%s:%d-%d", filePath, s.StartLine, s.EndLine)
-				if !seen[key] {
-					seen[key] = true
-					contextBuilder.WriteString(fmt.Sprintf(">>>>>> Usage in %s (line %d):\n", filePath, s.StartLine))
 					contextBuilder.WriteString(snippet)
 					contextBuilder.WriteString("\n")
 				}
@@ -98,6 +185,10 @@ func (g *SymbolContextGatherer) addSymbolContexts(symbol types.Symbol, projectRo
 	}
 
 	return contextBuilder.String(), nil
+}
+
+func isUsageType(symbolType string) bool {
+	return strings.HasSuffix(symbolType, "_usage") || strings.Contains(symbolType, "jsx_") || symbolType == "type_usage"
 }
 
 func (g *SymbolContextGatherer) findCandidateFiles(symbol types.Symbol, projectRoot, primaryLanguage string) ([]string, error) {

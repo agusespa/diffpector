@@ -330,165 +330,81 @@ func loadEvaluationRuns(dir string) ([]types.EvaluationRun, error) {
 }
 
 func CalculateScore(expected types.ExpectedResults, actual []types.Issue) float64 {
-	scores := []float64{
-		calculateIssueFoundScore(expected, actual),
-		calculateIssueCountScore(expected, actual),
-		calculateSeverityMatchScore(expected, actual),
-		calculateFileMatchScore(expected, actual),
-	}
-
-	var totalScore, applicableMetrics float64
-	weights := []float64{0.4, 0.3, 0.2, 0.1}
-
-	for i, score := range scores {
-		if score >= 0 { // -1 means not applicable
-			totalScore += score * weights[i]
-			applicableMetrics += weights[i]
+	// 1. False Positive Check
+	if !expected.ShouldFindIssues {
+		if len(actual) > 0 {
+			return 0.0 // Failed: Found issues when none expected
 		}
+		return 1.0 // Success: Found none as expected
 	}
 
-	if applicableMetrics == 0 {
-		return 1.0
+	// 2. False Negative Check
+	if len(actual) == 0 {
+		return 0.0 // Failed: Found none when expected
 	}
 
-	finalScore := totalScore / applicableMetrics
-	if finalScore > 1.0 {
-		finalScore = 1.0
-	}
-	if finalScore < 0.0 {
-		finalScore = 0.0
-	}
+	score := 1.0
 
-	return finalScore
-}
+	// 3. Severity Check (The most important metric)
+	// If the model found issues, but they are all "Minor" when we expect "Critical",
+	// it missed the point.
+	maxFoundSev := getMaxSeverity(actual)
+	maxExpectedSev := getMaxSeverityFromStrings(expected.ExpectedSeverity)
 
-func calculateIssueFoundScore(expected types.ExpectedResults, actual []types.Issue) float64 {
-	hasIssues := len(actual) > 0
-	if expected.ShouldFindIssues == hasIssues {
-		return 1.0
+	if maxFoundSev < maxExpectedSev {
+		// Penalty: 50% reduction if severity isn't high enough
+		// e.g. Found WARNING (20), Expected CRITICAL (40).
+		score -= 0.5
 	}
 
-	if expected.ShouldFindIssues && !hasIssues {
+	// 4. Count Check (Secondary metric)
+	if expected.MinIssues > 0 && len(actual) < expected.MinIssues {
+		score -= 0.2
+	}
+	if expected.MaxIssues > 0 && len(actual) > expected.MaxIssues {
+		score -= 0.1 // Less penalty for finding too many (could be noise)
+	}
+
+	if score < 0 {
 		return 0.0
 	}
-
-	if !expected.ShouldFindIssues && hasIssues {
-		// False positives - penalize based on severity
-		penalty := 0.0
-		for _, issue := range actual {
-			switch issue.Severity {
-			case "CRITICAL":
-				penalty += 0.5
-			case "WARNING":
-				penalty += 0.3
-			case "MINOR":
-				penalty += 0.1
-			}
-		}
-		score := 1.0 - penalty
-		if score < 0 {
-			score = 0
-		}
-		return score
-	}
-
-	return 0.0
+	return score
 }
 
-func calculateIssueCountScore(expected types.ExpectedResults, actual []types.Issue) float64 {
-	if expected.MinIssues == 0 && expected.MaxIssues == 0 {
-		return -1.0
+// Helpers for Severity Logic
+func getSeverityLevel(s string) int {
+	switch s {
+	case "CRITICAL":
+		return 40
+	case "HIGH":
+		return 30
+	case "WARNING", "MEDIUM":
+		return 20
+	case "MINOR", "LOW":
+		return 10
+	default:
+		return 0
 	}
-
-	count := len(actual)
-	minOk := expected.MinIssues == 0 || count >= expected.MinIssues
-	maxOk := expected.MaxIssues == 0 || count <= expected.MaxIssues
-
-	if minOk && maxOk {
-		return 1.0
-	}
-
-	if expected.MinIssues > 0 && count < expected.MinIssues {
-		ratio := float64(count) / float64(expected.MinIssues)
-		return ratio * 0.7
-	}
-
-	if expected.MaxIssues > 0 && count > expected.MaxIssues {
-		excess := count - expected.MaxIssues
-		expectedRange := expected.MaxIssues - expected.MinIssues
-		if expectedRange == 0 {
-			expectedRange = expected.MaxIssues
-		}
-		penalty := float64(excess) / float64(expectedRange)
-		score := 1.0 - (penalty * 0.3)
-		if score < 0.2 {
-			score = 0.2
-		}
-		return score
-	}
-
-	return 0.0
 }
 
-func calculateSeverityMatchScore(expected types.ExpectedResults, actual []types.Issue) float64 {
-	if len(expected.ExpectedSeverity) == 0 {
-		return -1.0
-	}
-
-	actualSeverities := make(map[string]int)
-	for _, issue := range actual {
-		actualSeverities[issue.Severity]++
-	}
-
-	matchCount := 0
-	partialMatchScore := 0.0
-
-	for _, expectedSev := range expected.ExpectedSeverity {
-		if actualSeverities[expectedSev] > 0 {
-			matchCount++
-		} else {
-			// Partial credit for related severities
-			switch expectedSev {
-			case "CRITICAL":
-				if actualSeverities["WARNING"] > 0 {
-					partialMatchScore += 0.3
-				}
-			case "WARNING":
-				if actualSeverities["CRITICAL"] > 0 {
-					partialMatchScore += 0.7
-				} else if actualSeverities["MINOR"] > 0 {
-					partialMatchScore += 0.2
-				}
-			case "MINOR":
-				if actualSeverities["WARNING"] > 0 {
-					partialMatchScore += 0.5
-				}
-			}
+func getMaxSeverity(issues []types.Issue) int {
+	max := 0
+	for _, issue := range issues {
+		lvl := getSeverityLevel(issue.Severity)
+		if lvl > max {
+			max = lvl
 		}
 	}
-
-	fullMatchScore := float64(matchCount) / float64(len(expected.ExpectedSeverity))
-	partialScore := partialMatchScore / float64(len(expected.ExpectedSeverity))
-
-	return fullMatchScore + partialScore
+	return max
 }
 
-func calculateFileMatchScore(expected types.ExpectedResults, actual []types.Issue) float64 {
-	if len(expected.ExpectedFiles) == 0 {
-		return -1.0
-	}
-
-	actualFiles := make(map[string]bool)
-	for _, issue := range actual {
-		actualFiles[issue.FilePath] = true
-	}
-
-	matchCount := 0
-	for _, expectedFile := range expected.ExpectedFiles {
-		if actualFiles[expectedFile] {
-			matchCount++
+func getMaxSeverityFromStrings(severities []string) int {
+	max := 0
+	for _, s := range severities {
+		lvl := getSeverityLevel(s)
+		if lvl > max {
+			max = lvl
 		}
 	}
-
-	return float64(matchCount) / float64(len(expected.ExpectedFiles))
+	return max
 }
